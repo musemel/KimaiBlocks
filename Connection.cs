@@ -59,7 +59,7 @@ public partial class Blocks {
   buttons.Children.Add(ButtonOf("今すぐ保存",async()=>await FlushAsync(true)));
   DockPanel.SetDock(buttons,Dock.Right);top.Children.Insert(0,buttons);
   connectionBadge.Text="Kimai未接続";connectionBadge.Foreground=BrushOf("#C7D7E6");connectionBadge.VerticalAlignment=VerticalAlignment.Center;top.Children.Add(connectionBadge);
-  saveTimer.Tick+=async(s,e)=>{if(!communicating&&!savePaused&&!closingRequested&&OwnedWindows.Count==0&&state.Pending.Count>0)await FlushAsync(false);};
+  saveTimer.Tick+=async(s,e)=>{if(!dragActive&&!communicating&&!savePaused&&!closingRequested&&OwnedWindows.Count==0&&state.Pending.Count>0)await FlushAsync(false);};
   Loaded+=async(s,e)=>{if(!demo)await StartupAsync();};
   Closing+=async(s,e)=>{
    if(demoMode||closingApproved)return;e.Cancel=true;
