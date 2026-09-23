@@ -20,6 +20,8 @@ using System.Windows.Threading;
  [DataMember] public bool Attempted;
 }
 public sealed class ConnectionSettings {
+ public List<AccountProfile> Accounts {get;set;}=new List<AccountProfile>();
+ public string ActiveAccountId {get;set;}="";
  public string Url {get;set;}="";
  public string Username {get;set;}="";
  public bool Legacy {get;set;}
@@ -75,6 +77,7 @@ public partial class Blocks {
   try {
    if(!File.Exists(SettingsFile)){ConnectionDialog();return;}
    settings=JsonSerializer.Deserialize<ConnectionSettings>(File.ReadAllText(SettingsFile))??new ConnectionSettings();
+   AccountProfile.Migrate(settings);
    if(settings.UserId>0)LoadAccount(settings.Url,settings.UserId);
    await ConnectAsync();
   }catch(Exception ex){needsRefresh=true;MessageBox.Show(this,SafeError(ex),"起動時の読み込み失敗");}
@@ -116,8 +119,8 @@ public partial class Blocks {
    progressText.Text="プロジェクトとアクティビティを読み込み中…";
    await LoadCatalog(candidate,false);
    service?.Dispose();service=candidate;candidate=null;
-   settings.UserId=service.Me.Id.Value;StoreSettings();ConfigureTimer();
-   connectionBadge.Text="接続: "+service.Me.Username+" · "+service.Me.Timezone;
+   settings.UserId=service.Me.Id.Value;var active=settings.Accounts.FirstOrDefault(a=>a.Id==settings.ActiveAccountId);if(active!=null)active.UserId=settings.UserId;StoreSettings();ConfigureTimer();
+   connectionBadge.Text="接続: "+(settings.Accounts.FirstOrDefault(a=>a.Id==settings.ActiveAccountId)?.Name??service.Me.Username)+" / "+service.Me.Username+" · "+service.Me.Timezone;
    needsRefresh=false;savePaused=state.Pending.Any(p=>p.Attempted);
    await RefreshView();
    if(state.Pending.Count==0){progressText.Text="今週の実績を読み込み中…";week=Monday(DateTime.Today);state.Entries=await service.ReadWeekAsync(week);}
@@ -218,30 +221,4 @@ public partial class Blocks {
  }
  internal static bool SameValues(Entry a,Entry b)=>a.ProjectId==b.ProjectId&&a.ActivityId==b.ActivityId&&a.Start==b.Start&&a.Minutes==b.Minutes&&(a.Note??"")==(b.Note??"")&&a.Billable==b.Billable;
  void StoreSettings() {Directory.CreateDirectory(DataDirectory);File.WriteAllText(SettingsFile+".tmp",JsonSerializer.Serialize(settings));File.Move(SettingsFile+".tmp",SettingsFile,true);}
- void ConnectionDialog() {
-  if(communicating)return;
-  var w=new Window {Title="設定",Owner=this,Width=550,Height=750,ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterOwner};
-  var panel=new StackPanel {Margin=new Thickness(22)};w.Content=panel;
-  var url=new TextBox {Text=settings.Url};var username=new TextBox {Text=settings.Username};var token=new PasswordBox();
-  try {token.Password=Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(settings.ProtectedToken),null,DataProtectionScope.CurrentUser));}catch{}
-  var legacy=new CheckBox {Content="旧認証方式（ユーザー名＋APIトークン）",IsChecked=settings.Legacy};
-  var http=new CheckBox {Content="この接続先でHTTPを許可",IsChecked=settings.AllowHttp};url.TextChanged+=(s,e)=>http.IsChecked=false;
-  var seconds=new TextBox {Text=settings.SaveSeconds.ToString()};var minutes=new TextBox {Text=settings.CatalogMinutes.ToString()};
-  string[] labels={"Kimai URL","ユーザー名（旧方式のみ）","APIトークン（Windowsユーザー用に暗号化して保存）","保存間隔（秒、10〜3600）","一覧キャッシュの有効期間（分、1〜1440）"};Control[] fields={url,username,token,seconds,minutes};
-  for(int i=0;i<fields.Length;i++){panel.Children.Add(Label(labels[i],12));fields[i].Padding=new Thickness(6);panel.Children.Add(fields[i]);}
-  var weekends=new CheckBox {Content="カレンダーに土日を表示",IsChecked=settings.ShowWeekends,Margin=new Thickness(4,10,4,10)};panel.Children.Add(weekends);
-  panel.Children.Add(ButtonOf("休日・休み時間の設定…",CalendarDialog));
-  panel.Children.Add(legacy);panel.Children.Add(http);panel.Children.Add(Label("起動時に自動接続します。変更は定期保存し、終了時にも保存します。\n「再読込」は一覧キャッシュも更新します。",12));
-  panel.Children.Add(ButtonOf("保存して接続",async()=>{
-   if(!int.TryParse(seconds.Text,out int sec)||sec<10||sec>3600||!int.TryParse(minutes.Text,out int min)||min<1||min>1440){MessageBox.Show(w,"保存間隔とキャッシュ期間を範囲内で指定してください。");return;}
-   try {
-    string normalized=KimaiService.NormalizeUrl(url.Text,http.IsChecked==true);
-    if(state.Pending.Count>0&&(normalized!=settings.Url||username.Text!=settings.Username||token.Password!=DecodeToken())){MessageBox.Show(w,"接続情報の変更前に未保存の実績を保存してください。");return;}
-    settings=new ConnectionSettings {ShowWeekends=weekends.IsChecked==true,ShowStatistics=settings.ShowStatistics,Calendar=settings.Calendar,Url=normalized,Username=username.Text,Legacy=legacy.IsChecked==true,AllowHttp=http.IsChecked==true,SaveSeconds=sec,CatalogMinutes=min,UserId=normalized==settings.Url?settings.UserId:0,ProtectedToken=Convert.ToBase64String(ProtectedData.Protect(Encoding.UTF8.GetBytes(token.Password),null,DataProtectionScope.CurrentUser))};
-    StoreSettings();w.Close();await ConnectAsync();
-   }catch(Exception ex){MessageBox.Show(w,SafeError(ex),"設定保存失敗");}
-  }));w.ShowDialog();
- }
- string DecodeToken(){try{return Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(settings.ProtectedToken),null,DataProtectionScope.CurrentUser));}catch{return "";}}
 }
-
