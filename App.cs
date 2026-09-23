@@ -154,7 +154,7 @@ public partial class Blocks : Window {
   box.LostMouseCapture+=(s,e)=>{if(dragActive){dragActive=false;Render();}};
   var menu=new ContextMenu();var edit=new MenuItem{Header="編集"};edit.Click+=(s,e)=>Edit(en);menu.Items.Add(edit);var del=new MenuItem{Header="削除"};del.Click+=(s,e)=>Delete(en);menu.Items.Add(del);box.ContextMenu=menu;
  }
- async void DropWork(object sender,DragEventArgs e) {if(!e.Data.GetDataPresent("work")||!CanEdit())return;var pos=e.GetPosition(board);if(pos.X<Gutter)return;string[] key=System.Text.Json.JsonSerializer.Deserialize<string[]>((string)e.Data.GetData("work"));int d=Math.Max(0,Math.Min(DisplayDayCount-1,(int)((pos.X-Gutter)/DayWidth)));int minute=Math.Min(1440-SlotMinutes,Snap(pos.Y/Hour*60));var en=new Entry{Project=key[0],Activity=key[1],Start=week.AddDays(d).AddMinutes(minute),Minutes=Math.Min(60,1440-minute)};if(!AssignIds(en))return;state.Entries.Add(en);selected=en;Render();e.Handled=true;await CommitEntry(en,null);}
+ async void DropWork(object sender,DragEventArgs e) {if(!e.Data.GetDataPresent("work")||!CanEdit())return;var pos=e.GetPosition(board);if(pos.X<Gutter)return;string[] key=System.Text.Json.JsonSerializer.Deserialize<string[]>((string)e.Data.GetData("work"));int d=Math.Max(0,Math.Min(DisplayDayCount-1,(int)((pos.X-Gutter)/DayWidth)));int minute=Math.Min(1440-SlotMinutes,Snap(pos.Y/Hour*60));var en=new Entry{Project=key[0],Activity=key[1],Start=week.AddDays(d).AddMinutes(minute),Minutes=Math.Min(60,1440-minute)};if(!AssignIds(en))return;e.Handled=true;await FinishBlockDrag(null,null,en,true,0);}
  async void Delete(Entry en) {await DeleteEntry(en);}
  void Edit(Entry en) {
   if(!CanEdit(en))return;Entry before=en.Copy();
