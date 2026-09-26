@@ -14,7 +14,7 @@ public partial class Blocks {
   var a=p==null?null:service.ForProject(p.Id.Value).FirstOrDefault(x=>service.ActivityName(x.Id.Value)==en.Activity);
   if(p==null||a==null){MessageBox.Show(this,"プロジェクトとアクティビティを選択してください。");return false;}
   en.ProjectId=p.Id.Value;en.ActivityId=a.Id.Value;
-  if(en.RemoteId==0)en.Billable=(p.Billable??true)&&(a.Billable??true);
+  if(en.RemoteId==0&&!en.BillableOverride)en.Billable=(p.Billable??true)&&(a.Billable??true);
   return true;
  }
  string ColorFor(string project) {return Colors[Math.Max(0,Array.IndexOf(Projects,project))%Colors.Length];}

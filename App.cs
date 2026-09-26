@@ -21,6 +21,7 @@ using System.Windows.Media;
  [DataMember] public int ProjectId;
  [DataMember] public int ActivityId;
  [DataMember] public bool Billable;
+ [DataMember] public bool BillableOverride;
  [DataMember] public string Fingerprint;
  [DataMember] public string ReadOnlyReason;
  public Entry Copy() { return (Entry)MemberwiseClone(); }
@@ -163,7 +164,7 @@ public partial class Blocks : Window {
   project.SelectionChanged+=(s,e)=>{activity.ItemsSource=ActivitiesFor((string)project.SelectedItem);activity.SelectedIndex=0;};
   string[] labels={"プロジェクト","アクティビティ","日付（未来も入力できます）","開始時刻 HH:mm","時間（分・5分単位）","メモ"};Control[] fields={project,activity,date,start,minutes,note};for(int i=0;i<fields.Length;i++){panel.Children.Add(Label(labels[i],12));panel.Children.Add(fields[i]);}
   var billable=new CheckBox {Content="請求対象",IsChecked=en.Billable,Margin=new Thickness(4,10,4,4)};panel.Children.Add(billable);
-  panel.Children.Add(ButtonOf("保存",async()=>{TimeSpan t;int m;if(project.SelectedItem==null||activity.SelectedItem==null||!date.SelectedDate.HasValue||!TimeSpan.TryParse(start.Text,out t)||!int.TryParse(minutes.Text,out m)||!ValidTime(t,m)){MessageBox.Show(w,"時刻と時間は5分単位で、終了は当日24:00までに設定してください。");return;}en.Project=(string)project.SelectedItem;en.Activity=(string)activity.SelectedItem;en.Start=date.SelectedDate.Value.Date+t;en.Minutes=m;en.Note=note.Text;en.Billable=billable.IsChecked==true;if(!AssignIds(en))return;w.Close();await CommitEntry(en,before);}));w.ShowDialog();
+  panel.Children.Add(ButtonOf("保存",async()=>{TimeSpan t;int m;if(project.SelectedItem==null||activity.SelectedItem==null||!date.SelectedDate.HasValue||!TimeSpan.TryParse(start.Text,out t)||!int.TryParse(minutes.Text,out m)||!ValidTime(t,m)){MessageBox.Show(w,"時刻と時間は5分単位で、終了は当日24:00までに設定してください。");return;}en.Project=(string)project.SelectedItem;en.Activity=(string)activity.SelectedItem;en.Start=date.SelectedDate.Value.Date+t;en.Minutes=m;en.Note=note.Text;en.BillableOverride=en.BillableOverride||en.Billable!=(billable.IsChecked==true);en.Billable=billable.IsChecked==true;if(!AssignIds(en))return;w.Close();await CommitEntry(en,before);}));w.ShowDialog();
  }
 }
 

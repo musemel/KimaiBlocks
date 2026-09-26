@@ -69,7 +69,7 @@ public partial class Blocks {
   MessageBox.Show(this,"休日または休み時間に重なるため入力できません。\n時間帯を変更するか、「休日・休み時間」で入力禁止を解除してください。","入力できない時間帯",MessageBoxButton.OK,MessageBoxImage.Information);return false;
  }
  static void RestoreEntry(Entry target,Entry original) {
-  target.Project=original.Project;target.Activity=original.Activity;target.ProjectId=original.ProjectId;target.ActivityId=original.ActivityId;target.Start=original.Start;target.Minutes=original.Minutes;target.Note=original.Note;target.Billable=original.Billable;
+  target.Project=original.Project;target.Activity=original.Activity;target.ProjectId=original.ProjectId;target.ActivityId=original.ActivityId;target.Start=original.Start;target.Minutes=original.Minutes;target.Note=original.Note;target.Billable=original.Billable;target.BillableOverride=original.BillableOverride;
  }
  void CalendarDialog() {
   if(communicating)return;

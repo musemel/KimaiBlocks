@@ -23,10 +23,9 @@ public sealed class LocalTimesheetForm : TimesheetEditForm {
   writer.WriteStringValue("begin",KimaiService.LocalDate(LocalBegin));
   writer.WriteStringValue("end",KimaiService.LocalDate(LocalEnd));
   writer.WriteStringValue("description",Description ?? "");
-  writer.WriteBoolValue("billable",Billable);writer.WriteBoolValue("exported",Exported);
+  if(Billable.HasValue)writer.WriteBoolValue("billable",Billable);
   if(Tags!=null)writer.WriteStringValue("tags",Tags);
-  if(FixedRate.HasValue)writer.WriteDoubleValue("fixedRate",FixedRate);
-  if(HourlyRate.HasValue)writer.WriteDoubleValue("hourlyRate",HourlyRate);
+
  }
 }
 public sealed class KimaiFailure : Exception {
@@ -41,6 +40,19 @@ public sealed class KimaiHttpGuard : DelegatingHandler {
   var response=await base.SendAsync(request,ct).ConfigureAwait(false);
   TotalPages=null;
   if(response.Headers.TryGetValues("X-Total-Pages",out var values)&&int.TryParse(values.FirstOrDefault(),out int pages))TotalPages=pages;
+  // Kimai may return form validation errors with HTTP 200 on PATCH.
+  if(request.Method==HttpMethod.Post||request.Method==HttpMethod.Patch) {
+   if(response.IsSuccessStatusCode||(int)response.StatusCode==400||(int)response.StatusCode==422) {
+    try {
+     using(var json=JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false))) {
+      if(json.RootElement.ValueKind==JsonValueKind.Object&&json.RootElement.TryGetProperty("errors",out var errors)&&errors.ValueKind==JsonValueKind.Object&&errors.TryGetProperty("children",out var children)) {
+       bool billableRejected=request.Content!=null&&(await request.Content.ReadAsStringAsync(ct).ConfigureAwait(false)).Contains("\"billable\"")&&!children.TryGetProperty("billable",out _);
+       response.Dispose();throw new KimaiFailure(billableRejected?"このユーザーには請求対象を変更する権限がありません。請求対象を元に戻して保存してください。":"Kimaiが入力を受け付けませんでした。編集権限・期間・重複・必須項目を確認してください。");
+      }
+     }
+    }catch(JsonException){}
+   }
+  }
   if(response.IsSuccessStatusCode)return response;
   int code=(int)response.StatusCode;response.Dispose();
   string detail=code==401?"認証に失敗しました。トークンと認証方式を確認してください。":
@@ -163,7 +175,7 @@ public sealed class KimaiService : IDisposable {
   var p=Projects.FirstOrDefault(x=>x.Id==edited.ProjectId);
   if(p==null||p.Visible==false||!ForProject(edited.ProjectId).Any(a=>a.Id==edited.ActivityId))throw new KimaiFailure("選択したプロジェクト・アクティビティは現在利用できません。再読込してください。");
   var prior=old?.RemoteId>0?await CheckCurrentAsync(old):null;
-  var form=new LocalTimesheetForm {Project=edited.ProjectId,Activity=edited.ActivityId,LocalBegin=edited.Start,LocalEnd=edited.Start.AddMinutes(edited.Minutes),Description=edited.Note,Billable=edited.Billable,Exported=false,Tags=prior==null?"":string.Join(",",prior.Tags??new List<string>()),FixedRate=prior?.FixedRate,HourlyRate=prior?.HourlyRate};
+  var form=new LocalTimesheetForm {Project=edited.ProjectId,Activity=edited.ActivityId,LocalBegin=edited.Start,LocalEnd=edited.Start.AddMinutes(edited.Minutes),Description=edited.Note,Billable=prior==null?(edited.BillableOverride?(bool?)edited.Billable:null):(edited.Billable!=(prior.Billable??false)?(bool?)edited.Billable:null)};
   try {
    var response=prior==null?await client.Api.Timesheets.PostAsync(form):await client.Api.Timesheets[edited.RemoteId.ToString()].PatchAsync(form);
    if(response==null||response.Id==null||response.User!=Me.Id)throw new KimaiFailure("保存結果を確認できません。再読込してください。",true);

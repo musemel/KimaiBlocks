@@ -15,6 +15,7 @@ public sealed class MockKimai : HttpMessageHandler {
  public List<string> Methods=new List<string>();
  public List<string> Queries=new List<string>();
  public string LastBody;
+ public bool GeneralUser,ValidationWithSuccessStatus;
  public bool Legacy,Paginated,HeaderPagination,Conflict,FailWrite,TimeoutWrite;
  protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken token) {
   if(!request.RequestUri.AbsolutePath.StartsWith("/kimai/api/"))throw new Exception("Subdirectory lost");
@@ -26,7 +27,8 @@ public sealed class MockKimai : HttpMessageHandler {
    if(FailWrite)return Reply("{}",HttpStatusCode.InternalServerError);
    if(request.Method==HttpMethod.Delete)return new HttpResponseMessage(HttpStatusCode.NoContent);
    LastBody=await request.Content.ReadAsStringAsync(token);var body=JsonNode.Parse(LastBody);var rec=JsonNode.Parse(Record);
-   foreach(var key in new[]{"project","activity","description","billable","exported"})rec[key]=body[key]?.DeepClone();
+   if(GeneralUser&&new[]{"billable","exported","fixedRate","hourlyRate"}.Any(k=>body.AsObject().ContainsKey(k)))return Reply("{\"code\":400,\"message\":\"Validation Failed\",\"errors\":{\"errors\":[\"This form should not contain extra fields.\"],\"children\":{\"begin\":{},\"end\":{},\"project\":{},\"activity\":{},\"description\":{},\"tags\":{}}}}",ValidationWithSuccessStatus?HttpStatusCode.OK:HttpStatusCode.BadRequest);
+   foreach(var key in new[]{"project","activity","description","billable","exported"})if(body.AsObject().ContainsKey(key))rec[key]=body[key]?.DeepClone();
    rec["begin"]=body["begin"].GetValue<string>()+"+09:00";rec["end"]=body["end"].GetValue<string>()+"+09:00";
    Record=rec.ToJsonString();return Reply(Record,request.Method==HttpMethod.Post?HttpStatusCode.Created:HttpStatusCode.OK);
   }
@@ -54,13 +56,13 @@ public static class KimaiServiceTests {
    var week=new DateTime(2026,9,21);var entries=await api.ReadWeekAsync(week);var original=entries.Single();Check(original.Start.Hour==9&&original.Start.Minute==5&&original.Minutes==5,"Timezone conversion changed wall time");
    Check(mock.Queries.Last().Contains("user=7")&&mock.Queries.Last().Contains("begin="),"Own-week filtering missing");
    var edited=original.Copy();edited.Start=edited.Start.AddMinutes(5);edited.Note="updated";
-   var saved=await api.WriteAsync(edited,original);using(var json=JsonDocument.Parse(mock.LastBody)){var r=json.RootElement;Check(r.GetProperty("begin").GetString()=="2026-09-21T09:10:00","Write contains timezone offset");Check(r.GetProperty("end").GetString()=="2026-09-21T09:15:00","Five minute duration changed");Check(r.GetProperty("tags").GetString()=="keep"&&r.GetProperty("hourlyRate").GetDouble()==125,"Metadata lost");Check(r.GetProperty("billable").GetBoolean()&&!r.GetProperty("exported").GetBoolean(),"Booleans lost");}
-   Check(saved.RemoteId==41&&saved.Note=="updated","PATCH response mapping");
+   var saved=await api.WriteAsync(edited,original);using(var json=JsonDocument.Parse(mock.LastBody)){var r=json.RootElement;Check(r.GetProperty("begin").GetString()=="2026-09-21T09:10:00","Write contains timezone offset");Check(r.GetProperty("end").GetString()=="2026-09-21T09:15:00","Five minute duration changed");Check(!r.TryGetProperty("tags",out _)&&!r.TryGetProperty("hourlyRate",out _)&&!r.TryGetProperty("fixedRate",out _)&&!r.TryGetProperty("billable",out _)&&!r.TryGetProperty("exported",out _),"Unchanged or privileged fields sent");}
+   Check(saved.RemoteId==41&&saved.Note=="updated","PATCH response mapping");Check(JsonNode.Parse(mock.Record)["hourlyRate"].GetValue<int>()==125&&JsonNode.Parse(mock.Record)["tags"][0].GetValue<string>()=="keep"&&saved.Billable,"Metadata was not preserved");
    mock.Conflict=true;int mutations=mock.Methods.Count(x=>x.StartsWith("PATCH"));bool rejected=false;try{await api.WriteAsync(saved.Copy(),saved);}catch(KimaiFailure){rejected=true;}Check(rejected&&mutations==mock.Methods.Count(x=>x.StartsWith("PATCH")),"Conflict was overwritten");mock.Conflict=false;
    await api.DeleteAsync(saved);Check(mock.Methods.Last().StartsWith("DELETE"),"Delete request missing");
    var fresh=saved.Copy();fresh.RemoteId=0;fresh.Fingerprint=null;fresh.Start=week.AddYears(1).AddHours(23).AddMinutes(55);fresh.Minutes=5;
    await api.WriteAsync(fresh,null);Check(mock.Methods.Last().StartsWith("POST"),"Create request missing");
-   using(var json=JsonDocument.Parse(mock.LastBody)){Check(json.RootElement.GetProperty("end").GetString()=="2027-09-22T00:00:00","Future midnight boundary");}
+   using(var json=JsonDocument.Parse(mock.LastBody)){Check(json.RootElement.GetProperty("end").GetString()=="2027-09-22T00:00:00","Future midnight boundary");Check(!json.RootElement.TryGetProperty("billable",out _)&&!json.RootElement.TryGetProperty("exported",out _),"New general-user record sent privileged fields");}
    mock.Paginated=true;var many=await api.ReadWeekAsync(week);Check(many.Count==101,"Pagination truncated");mock.Paginated=false;
    mock.HeaderPagination=true;many=await api.ReadWeekAsync(week);Check(many.Count==2,"Pagination headers ignored");mock.HeaderPagination=false;
    var special=new MarkZither.KimaiDotNet.Models.TimesheetEntity {Id=90,Project=11,Activity=22,User=7,Begin=new DateTimeOffset(2026,9,21,9,0,0,TimeSpan.FromHours(9)),End=null};
@@ -68,6 +70,17 @@ public static class KimaiServiceTests {
    special.Exported=false;special.End=special.Begin.Value.AddDays(1);special.Begin=special.Begin.Value.AddSeconds(3);Check(api.MapEntity(special).ReadOnlyReason!=null,"Non-grid entry must not be rounded and overwritten");
    mock.FailWrite=true;int calls=mock.Methods.Count;bool uncertain=false;try{await api.WriteAsync(fresh,null);}catch(KimaiFailure ex){uncertain=ex.Uncertain;}Check(uncertain&&mock.Methods.Count==calls+1,"Server failure retried automatically");mock.FailWrite=false;
    mock.TimeoutWrite=true;calls=mock.Methods.Count;uncertain=false;try{await api.WriteAsync(fresh,null);}catch(KimaiFailure ex){uncertain=ex.Uncertain;}Check(uncertain&&mock.Methods.Count==calls+1,"Timeout retried automatically");
+  }
+  var general=new MockKimai {GeneralUser=true};
+  using(var api=new KimaiService("https://kimai.test/kimai","test-only-token","",false,general)) {
+   await api.InitializeAsync();var baseline=(await api.ReadWeekAsync(new DateTime(2026,9,21))).Single();
+   var edit=baseline.Copy();edit.Minutes=10;var saved=await api.WriteAsync(edit,baseline);Check(saved.Minutes==10,"General-user update failed");
+   var fresh=BlockOperations.CopyAsNew(saved);await api.WriteAsync(fresh,null);
+   foreach(bool successStatus in new[]{false,true}) {
+    general.ValidationWithSuccessStatus=successStatus;fresh.Billable=false;fresh.BillableOverride=true;int calls=general.Methods.Count;bool definitive=false;
+    try {await api.WriteAsync(fresh,null);}catch(KimaiFailure ex){definitive=!ex.Uncertain&&ex.Message.Contains("請求対象");}
+    Check(definitive&&general.Methods.Count==calls+1,"Validation error misclassified or retried");
+   }
   }
   using(var legacy=new KimaiService("https://kimai.test/kimai","test-only-token","test",true,new MockKimai {Legacy=true})){await legacy.InitializeAsync();}
  }
