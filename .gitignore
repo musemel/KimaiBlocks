@@ -23,3 +23,5 @@ connection.json
 state.json
 kimai-*.json
 *.catalog
+
+token.key

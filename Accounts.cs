@@ -28,7 +28,7 @@ public sealed class AccountProfile {
  }
  public static void Migrate(ConnectionSettings settings) {
   settings.Accounts??=new List<AccountProfile>();
-  if(settings.Accounts.Count==0&&!string.IsNullOrWhiteSpace(settings.Url))settings.Accounts.Add(new AccountProfile {Name=string.IsNullOrWhiteSpace(settings.Username)?"既存のアカウント":settings.Username,Url=settings.Url,Username=settings.Username,ProtectedToken=settings.ProtectedToken,Legacy=settings.Legacy,AllowHttp=settings.AllowHttp,UserId=settings.UserId});
+  if(settings.Accounts.Count==0&&!string.IsNullOrWhiteSpace(settings.Url)&&!string.IsNullOrEmpty(settings.ProtectedToken))settings.Accounts.Add(new AccountProfile {Name=string.IsNullOrWhiteSpace(settings.Username)?"既存のアカウント":settings.Username,Url=settings.Url,Username=settings.Username,ProtectedToken=settings.ProtectedToken,Legacy=settings.Legacy,AllowHttp=settings.AllowHttp,UserId=settings.UserId});
   var active=settings.Accounts.FirstOrDefault(a=>a.Id==settings.ActiveAccountId)??settings.Accounts.FirstOrDefault();if(active!=null)Select(settings,active);
  }
  public static void Tests() {
@@ -50,9 +50,10 @@ public partial class Blocks {
   var bottom=new StackPanel();DockPanel.SetDock(bottom,Dock.Bottom);panel.Children.Add(bottom);
   var seconds=new TextBox {Text=settings.SaveSeconds.ToString(),Width=100};var minutes=new TextBox {Text=settings.CatalogMinutes.ToString(),Width=100};
   var options=new WrapPanel();options.Children.Add(Label("保存間隔（秒、10〜3600）",12));options.Children.Add(seconds);options.Children.Add(Label("一覧キャッシュ（分、1〜1440）",12));options.Children.Add(minutes);bottom.Children.Add(options);
+  bottom.Children.Add(Label("アップデート確認フォルダ（空欄で無効・UNCパス可）",12));var updateFolder=new TextBox {Text=settings.UpdateFolder,Margin=new Thickness(4)};bottom.Children.Add(updateFolder);
   var weekends=new CheckBox {Content="カレンダーに土日を表示",IsChecked=settings.ShowWeekends,Margin=new Thickness(4,12,4,8)};bottom.Children.Add(weekends);
   bottom.Children.Add(ButtonOf("休日・休み時間の設定…",CalendarDialog));
-  var note=Label("一覧からアカウントを選んで「選択したアカウントで保存して接続」を押してください。\nBearer認証ではAPIトークンが接続ユーザーを決定します。ユーザー名は管理用の表示です。\nトークンはWindowsユーザー用に暗号化して保存します。",12);note.TextWrapping=TextWrapping.Wrap;bottom.Children.Add(note);
+  var note=Label("一覧からアカウントを選んで「選択したアカウントで保存して接続」を押してください。\nBearer認証ではAPIトークンが接続ユーザーを決定します。ユーザー名は管理用の表示です。\nトークン入力は表示されます。AppDataのフォルダ全体をコピーして設定を移行できます。",12);note.TextWrapping=TextWrapping.Wrap;bottom.Children.Add(note);
   var heading=Label("接続アカウント",17);DockPanel.SetDock(heading,Dock.Top);panel.Children.Add(heading);
   var actions=new StackPanel {Orientation=Orientation.Horizontal};DockPanel.SetDock(actions,Dock.Top);panel.Children.Add(actions);
   var table=new DataGrid {ItemsSource=accounts,AutoGenerateColumns=false,IsReadOnly=true,CanUserAddRows=false,CanUserDeleteRows=false,SelectionMode=DataGridSelectionMode.Single,SelectionUnit=DataGridSelectionUnit.FullRow,Margin=new Thickness(0,8,0,16)};
@@ -74,7 +75,7 @@ public partial class Blocks {
     // Persist current-account UI settings before releasing the old account.
     Persist();
     var updated=JsonSerializer.Deserialize<ConnectionSettings>(JsonSerializer.Serialize(settings));
-    updated.Accounts=accounts.Select(a=>a.Copy()).ToList();updated.SaveSeconds=sec;updated.CatalogMinutes=min;updated.ShowWeekends=weekends.IsChecked==true;AccountProfile.Select(updated,updated.Accounts.Single(a=>a.Id==account.Id));
+    updated.UpdateFolder=updateFolder.Text.Trim();updated.Accounts=accounts.Select(a=>a.Copy()).ToList();updated.SaveSeconds=sec;updated.CatalogMinutes=min;updated.ShowWeekends=weekends.IsChecked==true;AccountProfile.Select(updated,updated.Accounts.Single(a=>a.Id==account.Id));
     settings=updated;try {StoreSettings();}catch {settings=previous;throw;}
     service?.Dispose();service=null;needsRefresh=true;savePaused=true;saveTimer.Stop();file=null;state=new State();Projects=Array.Empty<string>();selected=null;connectionBadge.Text="接続待ち: "+account.Name;PopulateProjectList();Populate();Render();
     w.Close();await ConnectAsync();
@@ -84,9 +85,9 @@ public partial class Blocks {
  }
  AccountProfile EditAccount(Window owner,AccountProfile source) {
   var w=new Window {Title="アカウント設定",Owner=owner,Width=560,Height=590,ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterOwner};var panel=new StackPanel {Margin=new Thickness(22)};w.Content=panel;
-  var name=new TextBox {Text=source.Name};var url=new TextBox {Text=source.Url};var username=new TextBox {Text=source.Username};var token=new PasswordBox();
+  var name=new TextBox {Text=source.Name};var url=new TextBox {Text=source.Url};var username=new TextBox {Text=source.Username};var token=new TextBox();
   bool tokenReadable=true;string oldToken="";
-  try {if(!string.IsNullOrEmpty(source.ProtectedToken))oldToken=Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(source.ProtectedToken),null,DataProtectionScope.CurrentUser));token.Password=oldToken;}catch {tokenReadable=false;}
+  try {if(!string.IsNullOrEmpty(source.ProtectedToken))oldToken=PortableToken.Read(source.ProtectedToken,DataDirectory);token.Text=oldToken;}catch {tokenReadable=false;}
   string[] labels={"表示名（例: 業務用・個人用）","Kimai URL","ユーザー名（Bearerでは管理用、旧方式では認証に使用）","APIトークン"};Control[] controls={name,url,username,token};
   for(int i=0;i<labels.Length;i++){panel.Children.Add(Label(labels[i],12));controls[i].Padding=new Thickness(6);panel.Children.Add(controls[i]);}
   var legacy=new CheckBox {Content="旧認証方式（ユーザー名＋APIトークン）",IsChecked=source.Legacy,Margin=new Thickness(4,14,4,8)};
@@ -96,10 +97,10 @@ public partial class Blocks {
   panel.Children.Add(ButtonOf("一覧に反映",()=>{
    try {
     string normalized=KimaiService.NormalizeUrl(url.Text,http.IsChecked==true);
-    if(string.IsNullOrWhiteSpace(name.Text)||string.IsNullOrWhiteSpace(token.Password))throw new ArgumentException("表示名とAPIトークンを入力してください。");
+    if(string.IsNullOrWhiteSpace(name.Text)||string.IsNullOrWhiteSpace(token.Text))throw new ArgumentException("表示名とAPIトークンを入力してください。");
     if(legacy.IsChecked==true&&string.IsNullOrWhiteSpace(username.Text))throw new ArgumentException("旧認証方式ではユーザー名が必要です。");
-    bool unchanged=tokenReadable&&normalized==source.Url&&username.Text==source.Username&&legacy.IsChecked==source.Legacy&&token.Password==oldToken;
-    result=new AccountProfile {Id=source.Id,Name=name.Text.Trim(),Url=normalized,Username=username.Text.Trim(),Legacy=legacy.IsChecked==true,AllowHttp=http.IsChecked==true,UserId=unchanged?source.UserId:0,ProtectedToken=unchanged?source.ProtectedToken:Convert.ToBase64String(ProtectedData.Protect(Encoding.UTF8.GetBytes(token.Password),null,DataProtectionScope.CurrentUser))};w.Close();
+    bool unchanged=tokenReadable&&normalized==source.Url&&username.Text==source.Username&&legacy.IsChecked==source.Legacy&&token.Text==oldToken;
+    result=new AccountProfile {Id=source.Id,Name=name.Text.Trim(),Url=normalized,Username=username.Text.Trim(),Legacy=legacy.IsChecked==true,AllowHttp=http.IsChecked==true,UserId=unchanged?source.UserId:0,ProtectedToken=unchanged?source.ProtectedToken:PortableToken.Protect(token.Text,DataDirectory)};w.Close();
    }catch(Exception ex){MessageBox.Show(w,SafeError(ex),"入力確認");}
   }));panel.Children.Add(ButtonOf("キャンセル",()=>w.Close()));w.ShowDialog();return result;
  }

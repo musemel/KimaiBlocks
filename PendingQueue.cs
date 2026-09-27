@@ -29,6 +29,10 @@ public static class PendingQueue {
   queue[0].Attempted=true;var state=new State {Pending=queue};
   var serializer=new DataContractJsonSerializer(typeof(State));using(var stream=new MemoryStream()){serializer.WriteObject(stream,state);stream.Position=0;state=(State)serializer.ReadObject(stream);}
   if(!state.Pending[0].Attempted||!state.Pending[0].Delete||state.Pending[0].Desired.LocalKey!=remote.LocalKey)throw new Exception("Crash recovery data lost");
+  var retained=new Entry {LocalKey="retained",RemoteId=99,Minutes=30};
+  var added=new Entry {LocalKey="new",Minutes=15};state.Entries.Add(retained);state.Entries.Add(added);state.Pending.Add(new PendingChange {Desired=added});
+  Blocks.RollbackPending(state);
+  if(state.Pending.Count!=0||state.Entries.Count!=2||!state.Entries.Contains(retained)||state.Entries.Single(e=>e.RemoteId==42).Minutes!=5)throw new Exception("Discard did not restore delete/remove new/preserve saved");
   var same=remote.Copy();if(!Blocks.SameValues(same,remote))throw new Exception("Reconciliation mismatch");same.Minutes+=5;if(Blocks.SameValues(same,remote))throw new Exception("Reconciliation ignored duration");
  }
 }

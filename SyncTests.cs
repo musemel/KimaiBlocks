@@ -14,7 +14,10 @@ public partial class Blocks {
    try {
     window=new Blocks(true);window.Show();window.demoMode=false;window.state=new State();window.file=Path.Combine(testFolder,"cache.json");
     var mock=new MockKimai();window.service=new KimaiService("https://example.test/kimai","test-token","",false,mock);await window.service.InitializeAsync();
-    Projects=window.service.Projects.Select(p=>window.service.ProjectName(p.Id.Value)).ToArray();
+    Projects=Array.Empty<string>();await window.RefreshView();
+    if(Projects.Any(p=>!window.state.Hidden.Contains(p)))throw new Exception("Initial project selection must be empty");
+    window.state.Hidden.Remove(Projects[0]);await window.RefreshView();
+    if(window.state.Hidden.Contains(Projects[0]))throw new Exception("Existing selection was reset");
     int notices=0;window.testError=text=>notices++;
     Entry NewEntry()=>new Entry {ProjectId=11,ActivityId=22,Project=window.service.ProjectName(11),Activity=window.service.ActivityName(22),Start=new DateTime(2026,9,21,9,5,0),Minutes=5,Billable=true};
     var entry=NewEntry();window.state.Entries.Add(entry);await window.CommitEntry(entry,null);

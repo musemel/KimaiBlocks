@@ -61,7 +61,7 @@ public partial class Blocks : Window {
  Brush Ink = new SolidColorBrush(Color.FromRgb(32, 49, 68));
  [STAThread] public static void Main(string[] args) {
   if(args.Contains("--sync-test")) {RunSyncTests();return;}
-  if (args.Contains("--self-test")) { AccountProfile.Tests(); BlockOperations.Tests(); CalendarRules.Tests(); PendingQueue.Tests(); SidebarTests(); KimaiServiceTests.Run().GetAwaiter().GetResult(); if (HitMode(1,12)!=1 || HitMode(6,12)!=0 || HitMode(11,12)!=2 || Snap(63)!=65 || Snap(62)!=60 || Snap(5)!=5 || RoundDelta(-6)!=-5 || ResizeDuration(1435,5,10)!=5 || ResizeDuration(540,10,-20)!=5 || !ValidTime(TimeSpan.FromHours(9)+TimeSpan.FromMinutes(5),5) || ValidTime(TimeSpan.FromHours(9)+TimeSpan.FromMinutes(1),5) || ValidTime(TimeSpan.FromHours(23)+TimeSpan.FromMinutes(55),10) || Snap(-1)!=0 || Monday(new DateTime(2026,9,20))!=new DateTime(2026,9,14)) Environment.Exit(1); return; }
+  if (args.Contains("--self-test")) { PortableToken.Tests(); AccountProfile.Tests(); BlockOperations.Tests(); CalendarRules.Tests(); PendingQueue.Tests(); SidebarTests(); KimaiServiceTests.Run().GetAwaiter().GetResult(); if (HitMode(1,12)!=1 || HitMode(6,12)!=0 || HitMode(11,12)!=2 || Snap(63)!=65 || Snap(62)!=60 || Snap(5)!=5 || RoundDelta(-6)!=-5 || ResizeDuration(1435,5,10)!=5 || ResizeDuration(540,10,-20)!=5 || !ValidTime(TimeSpan.FromHours(9)+TimeSpan.FromMinutes(5),5) || ValidTime(TimeSpan.FromHours(9)+TimeSpan.FromMinutes(1),5) || ValidTime(TimeSpan.FromHours(23)+TimeSpan.FromMinutes(55),10) || Snap(-1)!=0 || Monday(new DateTime(2026,9,20))!=new DateTime(2026,9,14)) Environment.Exit(1); return; }
   if(args.Contains("--render")) { var app=new Application();var window=new Blocks(true);window.state.Folders.Add("開発案件");window.state.ProjectFolders[Projects[0]]="開発案件";window.state.ProjectFolders[Projects[1]]="開発案件";window.state.Collapsed.Add("project:"+Projects[1]);window.Populate();window.state.Entries.Add(new Entry { Project=Projects[0], Activity="レビュー", Start=window.week.AddHours(10).AddMinutes(35), Minutes=5 });var view=(FrameworkElement)window.Content;view.Width=1320;view.Height=900;view.Measure(new Size(1320,900));view.Arrange(new Rect(0,0,1320,900));window.Render();view.UpdateLayout();window.calendarScroll.ScrollToVerticalOffset(8*Hour);view.UpdateLayout();var bmp=new System.Windows.Media.Imaging.RenderTargetBitmap(1320,900,96,96,PixelFormats.Pbgra32);bmp.Render(view);var png=new System.Windows.Media.Imaging.PngBitmapEncoder();png.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bmp));using(var f=File.Create(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"preview.png")))png.Save(f);return; }
   new Application().Run(new Blocks());
  }
@@ -75,7 +75,7 @@ public partial class Blocks : Window {
  Button ButtonOf(string text, Action action) { var b=new Button { Content=text, Padding=new Thickness(12,7,12,7), Margin=new Thickness(3), Background=Brushes.White, BorderBrush=BrushOf("#DCE3EA"), Cursor=Cursors.Hand }; b.Click+=(s,e)=>action(); return b; }
  TextBlock Label(string t, double size) { return new TextBlock { Text=t, FontSize=size, Foreground=Ink, Margin=new Thickness(4), VerticalAlignment=VerticalAlignment.Center }; }
  public Blocks(bool demo = false) {
-  Title="Kimai Blocks — UIプロトタイプ"; Width=1540; Height=900; MinWidth=1240; MinHeight=650; Background=BrushOf("#F5F7FA"); FontFamily=new FontFamily("Yu Gothic UI"); FontSize=13;
+  Title="Kimai Blocks — "+AppVersion; Width=1540; Height=900; MinWidth=1240; MinHeight=650; Background=BrushOf("#F5F7FA"); FontFamily=new FontFamily("Yu Gothic UI"); FontSize=13;
   Icon=System.Windows.Media.Imaging.BitmapFrame.Create(new Uri("pack://application:,,,/Assets/KimaiBlocks.ico"));
   week=Monday(DateTime.Today); if(demo)Load(true);else {state=new State();Projects=Array.Empty<string>();file=null;}
   var root=new DockPanel { Background=Background }; Content=root;
@@ -104,7 +104,7 @@ public partial class Blocks : Window {
   state=new State(); state.Favorites.Add(Projects[0]+"|設計");
   for(int d=0;d<5;d++) { state.Entries.Add(new Entry { Project=Projects[d%4],Activity="設計",Start=week.AddDays(d).AddHours(9),Minutes=90 });state.Entries.Add(new Entry {Project=Projects[(d+1)%4],Activity="実装",Start=week.AddDays(d).AddHours(11),Minutes=120});state.Entries.Add(new Entry {Project=Projects[d%4],Activity="レビュー",Start=week.AddDays(d).AddHours(14),Minutes=60}); }
  }
- void Save() { try { Persist(); } catch(Exception ex) { status.Text="キャッシュ保存失敗: "+ex.Message;MessageBox.Show(this,status.Text,"保存失敗"); } }
+ void Save() { try { Persist(); } catch(Exception ex) { status.Text="キャッシュ保存失敗: "+SafeError(ex);if(state.Pending.Count>0)OfferDiscard(status.Text);else MessageBox.Show(this,status.Text,"保存失敗"); } }
  void Persist() {
   if(file==null)return;
   state.CachedWeek=week;state.CachedProjects=Projects;
@@ -125,6 +125,7 @@ public partial class Blocks : Window {
    for(int h=0;h<24;h++) {var t=Label(h.ToString("00")+":00",11);Canvas.SetTop(t,h*Hour);board.Children.Add(t);var line=new Border {Height=1,Width=DisplayDayCount*DayWidth,Background=BrushOf("#E8EDF2")};Canvas.SetLeft(line,Gutter);Canvas.SetTop(line,h*Hour);board.Children.Add(line);}
    for(int minute=SlotMinutes;minute<1440;minute+=SlotMinutes) { if(minute%60==0)continue;var line=new Border { Height=1, Width=DisplayDayCount*DayWidth, Background=BrushOf(minute%30==0?"#DCE4ED":"#F0F3F7"), IsHitTestVisible=false }; Canvas.SetLeft(line,Gutter);Canvas.SetTop(line,minute/60.0*Hour);board.Children.Add(line); }
    foreach(var en in entries.Where(e=>(e.Start.Date-week).Days<DisplayDayCount)) DrawEntry(en,entries);
+   DrawNow();
   } finally {busy=false;}
  }
  void DrawEntry(Entry en,List<Entry> entries) {

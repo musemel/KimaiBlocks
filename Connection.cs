@@ -32,6 +32,7 @@ public sealed class ConnectionSettings {
  public CalendarRules Calendar {get;set;}=new CalendarRules();
  public bool ShowWeekends {get;set;}=true;
  public bool ShowStatistics {get;set;}=true;
+ public string UpdateFolder {get;set;}="";
  public int UserId {get;set;}
 }
 public partial class Blocks {
@@ -41,8 +42,7 @@ public partial class Blocks {
  DispatcherTimer saveTimer=new DispatcherTimer();
  TextBlock connectionBadge=new TextBlock();
  Action<string> testError;
- void ShowSaveError(string text) {if(testError!=null)testError(text);else MessageBox.Show(progressWindow??this,text,"保存失敗");}
- Window progressWindow;
+  Window progressWindow;
  TextBlock progressText;
  static string DataDirectory=>Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"KimaiBlocks");
  static string SettingsFile=>Path.Combine(DataDirectory,"connection.json");
@@ -56,6 +56,8 @@ public partial class Blocks {
   var create=new MenuItem {Header="プロジェクト追加…",Foreground=Brushes.Black};create.Click+=async(s,e)=>await ProjectDialog();item.Items.Add(create);
   var calendar=new MenuItem {Header="休日・休み時間…",Foreground=Brushes.Black};calendar.Click+=(s,e)=>CalendarDialog();item.Items.Add(calendar);menu.Items.Add(item);buttons.Children.Add(menu);
   var config=new MenuItem {Header="設定…",Foreground=Brushes.Black};config.Click+=(s,e)=>ConnectionDialog();item.Items.Add(config);
+  var reset=new MenuItem {Header="バックアップを破棄してサーバーから再取得…",Foreground=Brushes.Black};reset.Click+=async(s,e)=>await ResetFromServer();item.Items.Add(reset);
+  var update=new MenuItem {Header="アップデートを確認",Foreground=Brushes.Black};update.Click+=async(s,e)=>await CheckUpdates(true);item.Items.Add(update);
   var stats=new MenuItem {Header="右の統計パネルを表示／非表示",Foreground=Brushes.Black};stats.Click+=(s,e)=>SetStatisticsVisible(!settings.ShowStatistics);item.Items.Add(stats);
   buttons.Children.Add(ButtonOf("再読込",async()=>await RefreshRemote()));
   buttons.Children.Add(ButtonOf("今すぐ保存",async()=>await FlushAsync(true)));
@@ -71,13 +73,14 @@ public partial class Blocks {
    catch(Exception ex){MessageBox.Show(this,SafeError(ex)+"\n保存できないため終了を中止しました。","終了できません");}
    finally {closingRequested=false;}
   };
-  Closed+=(s,e)=>{saveTimer.Stop();service?.Dispose();};
+  StartClock();
+  Closed+=(s,e)=>{clockTimer.Stop();saveTimer.Stop();service?.Dispose();};
  }
  async Task StartupAsync() {
   try {
-   if(!File.Exists(SettingsFile)){ConnectionDialog();return;}
+   if(!File.Exists(SettingsFile)){LoadDefaults();ConnectionDialog();_ = CheckUpdates(false);return;}
    settings=JsonSerializer.Deserialize<ConnectionSettings>(File.ReadAllText(SettingsFile))??new ConnectionSettings();
-   AccountProfile.Migrate(settings);
+   AccountProfile.Migrate(settings);PortableToken.Migrate(settings,DataDirectory);StoreSettings();_ = CheckUpdates(false);
    if(settings.UserId>0)LoadAccount(settings.Url,settings.UserId);
    await ConnectAsync();
   }catch(Exception ex){needsRefresh=true;MessageBox.Show(this,SafeError(ex),"起動時の読み込み失敗");}
@@ -111,7 +114,7 @@ public partial class Blocks {
   if(communicating)return;
   await BeginProgress("Kimaiに接続しています…");KimaiService candidate=null;
   try {
-   string token=Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(settings.ProtectedToken),null,DataProtectionScope.CurrentUser));
+   string token=PortableToken.Read(settings.ProtectedToken,DataDirectory);
    candidate=new KimaiService(settings.Url,token,settings.Username,settings.Legacy,allowHttp:settings.AllowHttp);
    await candidate.InitializeAsync(false);
    if(state.Pending.Count>0&&file!=AccountFile(candidate.BaseUrl,candidate.Me.Id.Value))throw new KimaiFailure("未保存の変更があるため接続先を変更できません。");
@@ -131,7 +134,7 @@ public partial class Blocks {
  }
  async Task RefreshView() {
   var old=Projects;Projects=service.Projects.Where(p=>p.Visible!=false).Select(p=>service.ProjectName(p.Id.Value)).ToArray();
-  foreach(var p in Projects.Except(old))if(!state.Collapsed.Contains("project:"+p))state.Collapsed.Add("project:"+p);
+  foreach(var p in Projects.Except(old)){if(!state.Hidden.Contains(p))state.Hidden.Add(p);if(!state.Collapsed.Contains("project:"+p))state.Collapsed.Add("project:"+p);}
   await Dispatcher.Yield(DispatcherPriority.Background);PopulateProjectList();Populate();Render();
  }
  bool CanEdit(Entry en=null) {
@@ -158,8 +161,8 @@ public partial class Blocks {
  async Task<bool> FlushAsync(bool manual) {
   if(communicating)return false;
   if(state.Pending.Count==0)return true;
-  if(service==null||needsRefresh){if(manual)MessageBox.Show(this,"接続が必要です。設定または再読込を確認してください。変更は保持されています。","保存できません");return false;}
-  if(state.Pending.Any(p=>p.Attempted)){if(manual)MessageBox.Show(this,"保存結果が不明な変更があります。「再読込」で結果を確認してください。終了を中止しました。","保存できません");return false;}
+  if(service==null||needsRefresh){return manual&&OfferDiscard("接続が必要です。設定または再読込を確認してください。");}
+  if(state.Pending.Any(p=>p.Attempted)){return manual&&OfferDiscard("保存結果が不明な変更があります。「再読込」で結果を確認してください。");}
   await BeginProgress("変更をKimaiへ保存しています…");
   try {
    while(state.Pending.Count>0) {
@@ -172,7 +175,7 @@ public partial class Blocks {
     state.Pending.RemoveAt(0);Persist();
    }
    savePaused=false;status.Text="Kimai保存済み · "+DateTime.Now.ToString("HH:mm:ss");return true;
-  }catch(Exception ex){savePaused=true;ShowSaveError(SafeError(ex)+"\n変更を保持し、定期保存を一時停止しました。再読込または今すぐ保存で確認してください。\n保存が完了するまで終了できません。");return false;}
+  }catch(Exception ex){savePaused=true;return OfferDiscard(SafeError(ex)+"\n定期保存を一時停止しました。再読込または今すぐ保存で確認してください。");}
   finally {EndProgress();Render();}
  }
  async Task ChangeWeek(DateTime next) {if(communicating)return;if(!await FlushAsync(true))return;await ReadRemote(next,false);}
@@ -220,5 +223,5 @@ public partial class Blocks {
   finally {EndProgress();Render();}
  }
  internal static bool SameValues(Entry a,Entry b)=>a.ProjectId==b.ProjectId&&a.ActivityId==b.ActivityId&&a.Start==b.Start&&a.Minutes==b.Minutes&&(a.Note??"")==(b.Note??"")&&a.Billable==b.Billable;
- void StoreSettings() {Directory.CreateDirectory(DataDirectory);File.WriteAllText(SettingsFile+".tmp",JsonSerializer.Serialize(settings));File.Move(SettingsFile+".tmp",SettingsFile,true);}
+ void StoreSettings() {PortableToken.Migrate(settings,DataDirectory);Directory.CreateDirectory(DataDirectory);File.WriteAllText(SettingsFile+".tmp",JsonSerializer.Serialize(settings));File.Move(SettingsFile+".tmp",SettingsFile,true);}
 }

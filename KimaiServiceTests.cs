@@ -53,6 +53,7 @@ public static class KimaiServiceTests {
   foreach(var url in new[]{"http://kimai.test","https://user:pass@kimai.test","https://kimai.test/?token=x"}){bool rejected=false;try{KimaiService.NormalizeUrl(url);}catch(ArgumentException){rejected=true;}Check(rejected,"Unsafe URL accepted");}
   var mock=new MockKimai();using(var api=new KimaiService("https://kimai.test/kimai","test-only-token","",false,mock)) {
    await api.InitializeAsync();Check(api.Projects.Count==2,"Project retrieval");Check(api.ProjectName(11)!=api.ProjectName(12),"Duplicate names merged");Check(api.ForProject(11).Count()==2&&api.ForProject(12).Count()==1,"Project activity filtering");
+   api.Projects[0].GlobalActivities=null;Check(api.ForProject(11).All(a=>a.Project==11),"Unknown global flag must not expose globals");api.Projects[0].GlobalActivities=true;
    var week=new DateTime(2026,9,21);var entries=await api.ReadWeekAsync(week);var original=entries.Single();Check(original.Start.Hour==9&&original.Start.Minute==5&&original.Minutes==5,"Timezone conversion changed wall time");
    Check(mock.Queries.Last().Contains("user=7")&&mock.Queries.Last().Contains("begin="),"Own-week filtering missing");
    var edited=original.Copy();edited.Start=edited.Start.AddMinutes(5);edited.Note="updated";

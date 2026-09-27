@@ -1,5 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <Version>2026.9.27.549</Version>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
@@ -10,6 +11,7 @@
     <ApplicationIcon>Assets/KimaiBlocks.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <None Update="defaults.json" CopyToOutputDirectory="PreserveNewest" />
     <Resource Include="Assets/KimaiBlocks.ico" />
     <PackageReference Include="MarkZither.KimaiDotNet.ApiClient" Version="1.0.0" />
   </ItemGroup>

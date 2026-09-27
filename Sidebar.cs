@@ -43,7 +43,8 @@ public partial class Blocks {
   choices.Children.Add(Label("表示プロジェクト",17));
   projectSearch.Padding=new Thickness(7);projectSearch.Margin=new Thickness(3);projectSearch.ToolTip="表示対象をプロジェクト名で検索";
   choices.Children.Add(Label("プロジェクト名で検索",11));choices.Children.Add(projectSearch);
-  projectList.Height=460;projectList.Margin=new Thickness(3);projectList.BorderBrush=BrushOf("#E2E8F0");
+  choices.Children.Add(ButtonOf("すべてのチェックを外す",()=>{foreach(var p in Projects)if(!state.Hidden.Contains(p))state.Hidden.Add(p);Save();PopulateProjectList();Populate();}));
+  projectList.Height=420;projectList.Margin=new Thickness(3);projectList.BorderBrush=BrushOf("#E2E8F0");
   ScrollViewer.SetHorizontalScrollBarVisibility(projectList,ScrollBarVisibility.Disabled);
   VirtualizingPanel.SetIsVirtualizing(projectList,true);VirtualizingPanel.SetVirtualizationMode(projectList,VirtualizationMode.Recycling);
   var check=new FrameworkElementFactory(typeof(CheckBox));
@@ -60,7 +61,7 @@ public partial class Blocks {
    Save();Populate();
   })).ToList();
  }
- static bool Matches(string value,string query) {return value.IndexOf(query.Trim(),StringComparison.CurrentCultureIgnoreCase)>=0;}
+ static bool Matches(string value,string query) {string Clean(string s)=>new string((s??" ").Normalize(NormalizationForm.FormKC).Where(c=>!char.IsWhiteSpace(c)).ToArray());return System.Globalization.CultureInfo.GetCultureInfo("ja-JP").CompareInfo.IndexOf(Clean(value),Clean(query),System.Globalization.CompareOptions.IgnoreCase|System.Globalization.CompareOptions.IgnoreKanaType|System.Globalization.CompareOptions.IgnoreWidth)>=0;}
  string FolderOf(string project) {string f;return state.ProjectFolders.TryGetValue(project,out f)&&state.Folders.Contains(f)?f:null;}
  void Populate() {
   rebuildingTree=true;
@@ -139,6 +140,7 @@ public partial class Blocks {
   var data=new State();data.Folders.Add("仕事");data.ProjectFolders["A"]="仕事";data.ProjectFolders["B"]="仕事";data.Hidden.Add("B");data.Collapsed.Add("folder:仕事");
   using(var stream=new MemoryStream()){serializer.WriteObject(stream,data);stream.Position=0;data=(State)serializer.ReadObject(stream);if(data.ProjectFolders["A"]!="仕事")throw new Exception("Folder persistence failed");}
   data.RemoveFolder("仕事");if(data.Folders.Count!=0||data.ProjectFolders.Count!=0||data.Collapsed.Count!=0||!data.Hidden.Contains("B"))throw new Exception("Folder removal failed");
+  if(!Matches("ガラス　テスト","ｶﾞﾗｽﾃｽﾄ")||!Matches("カタカナ","かたかな")||!Matches("Project A","projecta"))throw new Exception("Japanese search failed");
   if(!Matches("Project A","project")||Matches("Project A","other"))throw new Exception("Search failed");
  }
 }
