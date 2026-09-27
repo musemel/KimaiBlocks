@@ -9,13 +9,17 @@ public sealed class CalendarRules {
  public int[] DaysOff {get;set;}=new[]{0,6};
  public string Holidays {get;set;}="";
  public string Breaks {get;set;}="12:00-13:00";
+ public string OffHours {get;set;}="";
  public bool Shade {get;set;}=true;
  public bool BlockInput {get;set;}
  public List<(int Start,int End)> Intervals() {
+  return ParseIntervals(Breaks,"休み時間").Concat(ParseIntervals(OffHours,"時間外")).ToList();
+ }
+ static List<(int Start,int End)> ParseIntervals(string value,string name) {
   var result=new List<(int,int)>();
-  foreach(string line in (Breaks??"").Split(new[]{'\r','\n',','},StringSplitOptions.RemoveEmptyEntries)) {
+  foreach(string line in (value??"").Split(new[]{'\r','\n',','},StringSplitOptions.RemoveEmptyEntries)) {
    var pair=line.Trim().Split('-');
-   if(pair.Length!=2||!Minute(pair[0],out int begin)||!Minute(pair[1],out int end)||begin>=end)throw new ArgumentException("休み時間は 12:00-13:00 の形式で指定してください（5分単位、同日内、終了は24:00まで）。");
+   if(pair.Length!=2||!Minute(pair[0],out int begin)||!Minute(pair[1],out int end)||begin>=end)throw new ArgumentException(name+"は 12:00-13:00 の形式で指定してください（5分単位、同日内、終了は24:00まで）。");
    result.Add((begin,end));
   }
   return result;
@@ -39,6 +43,9 @@ public sealed class CalendarRules {
   if(!rules.Intersects(monday.AddHours(11).AddMinutes(55),10)||!rules.Intersects(monday.AddDays(5).AddHours(9),5))throw new Exception("Forbidden interval missed");
   rules.Holidays="2026-09-22";if(!rules.Intersects(monday.AddDays(1).AddHours(9),5)||rules.Intersects(monday.AddHours(23),60))throw new Exception("Holiday boundary failed");
   rules.Breaks="12:00-13:00\n18:00-18:15";if(!rules.Intersects(monday.AddHours(18),5))throw new Exception("Multiple breaks failed");
+  rules.OffHours="00:00-09:00\n18:00-24:00";
+  if(!rules.Intersects(monday.AddHours(8).AddMinutes(55),10)||rules.Intersects(monday.AddHours(9),5)||!rules.Intersects(monday.AddHours(23).AddMinutes(55),5))throw new Exception("Off-hours boundary failed");
+  rules.OffHours="18:00-09:00";try{rules.Intervals();throw new Exception("Cross-midnight interval accepted");}catch(ArgumentException){}rules.OffHours="";
   rules.Breaks="12:01-13:00";try {rules.Intervals();throw new Exception("Invalid interval accepted");}catch(ArgumentException){}
  }
  public bool Intersects(DateTime start,int minutes) {
@@ -66,24 +73,25 @@ public partial class Blocks {
  }
  bool AcceptSchedule(Entry entry,Entry before) {
   if(!Rules.BlockInput||before!=null&&before.Start==entry.Start&&before.Minutes==entry.Minutes||!Rules.Intersects(entry.Start,entry.Minutes))return true;
-  MessageBox.Show(this,"休日または休み時間に重なるため入力できません。\n時間帯を変更するか、「休日・休み時間」で入力禁止を解除してください。","入力できない時間帯",MessageBoxButton.OK,MessageBoxImage.Information);return false;
+  MessageBox.Show(this,"休日・休み時間・時間外に重なるため入力できません。\n時間帯を変更するか、「休日・休み時間・時間外」で入力禁止を解除してください。","入力できない時間帯",MessageBoxButton.OK,MessageBoxImage.Information);return false;
  }
  static void RestoreEntry(Entry target,Entry original) {
   target.Project=original.Project;target.Activity=original.Activity;target.ProjectId=original.ProjectId;target.ActivityId=original.ActivityId;target.Start=original.Start;target.Minutes=original.Minutes;target.Note=original.Note;target.Billable=original.Billable;target.BillableOverride=original.BillableOverride;
  }
  void CalendarDialog() {
   if(communicating)return;
-  var w=new Window {Title="休日・休み時間",Owner=this,Width=510,Height=650,ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterOwner};
-  var panel=new StackPanel {Margin=new Thickness(22)};w.Content=panel;
+  var w=new Window {Title="休日・休み時間・時間外",Owner=this,Width=510,Height=760,ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterOwner};
+  var panel=new StackPanel {Margin=new Thickness(22)};w.Content=new ScrollViewer {Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
   panel.Children.Add(Label("毎週の休日",15));var days=new WrapPanel();var checks=new List<CheckBox>();
   string[] labels={"日","月","火","水","木","金","土"};for(int d=0;d<7;d++){var c=new CheckBox {Content=labels[d],IsChecked=(Rules.DaysOff??Array.Empty<int>()).Contains(d),Margin=new Thickness(8)};checks.Add(c);days.Children.Add(c);}panel.Children.Add(days);
   panel.Children.Add(Label("追加の休業日（1行に1日、例: 2026-12-31）",12));var holidays=new TextBox {Text=Rules.Holidays,Height=90,AcceptsReturn=true,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};panel.Children.Add(holidays);
   panel.Children.Add(Label("毎日の休み時間（1行に1区間、例: 12:00-13:00）",12));var breaks=new TextBox {Text=Rules.Breaks,Height=90,AcceptsReturn=true,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};panel.Children.Add(breaks);
-  var shade=new CheckBox {Content="休日・休み時間を暗色で表示",IsChecked=Rules.Shade,Margin=new Thickness(4,16,4,8)};
-  var block=new CheckBox {Content="休日・休み時間への入力を禁止",IsChecked=Rules.BlockInput,Margin=new Thickness(4,8,4,12)};panel.Children.Add(shade);panel.Children.Add(block);
+  panel.Children.Add(Label("毎日の時間外（例: 00:00-09:00、18:00-24:00を別行に）",12));var offHours=new TextBox {Text=Rules.OffHours,Height=70,AcceptsReturn=true,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};panel.Children.Add(offHours);
+  var shade=new CheckBox {Content="休日・休み時間・時間外を暗色で表示",IsChecked=Rules.Shade,Margin=new Thickness(4,16,4,8)};
+  var block=new CheckBox {Content="休日・休み時間・時間外への入力を禁止",IsChecked=Rules.BlockInput,Margin=new Thickness(4,8,4,12)};panel.Children.Add(shade);panel.Children.Add(block);
   var note=Label("Kimaiユーザーの時刻で適用します。祝日は自動取得しません。\n入力禁止は新規作成・移動・時間変更に適用します。\n既存の実績や保存待ちの変更は削除しません。",12);note.TextWrapping=TextWrapping.Wrap;panel.Children.Add(note);
   panel.Children.Add(ButtonOf("保存",()=>{
-   var updated=new CalendarRules {DaysOff=checks.Select((c,i)=>c.IsChecked==true?i:-1).Where(i=>i>=0).ToArray(),Holidays=holidays.Text,Breaks=breaks.Text,Shade=shade.IsChecked==true,BlockInput=block.IsChecked==true};
+   var updated=new CalendarRules {DaysOff=checks.Select((c,i)=>c.IsChecked==true?i:-1).Where(i=>i>=0).ToArray(),Holidays=holidays.Text,Breaks=breaks.Text,OffHours=offHours.Text,Shade=shade.IsChecked==true,BlockInput=block.IsChecked==true};
    var original=settings.Calendar;
    try {updated.Intervals();updated.HolidayDates();settings.Calendar=updated;StoreSettings();Render();w.Close();}
    catch(Exception ex){settings.Calendar=original;MessageBox.Show(w,SafeError(ex),"設定を保存できません");}

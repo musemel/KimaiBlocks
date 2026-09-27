@@ -61,7 +61,7 @@ public partial class Blocks : Window {
  Brush Ink = new SolidColorBrush(Color.FromRgb(32, 49, 68));
  [STAThread] public static void Main(string[] args) {
   if(args.Contains("--sync-test")) {RunSyncTests();return;}
-  if (args.Contains("--self-test")) { PortableToken.Tests(); AccountProfile.Tests(); BlockOperations.Tests(); CalendarRules.Tests(); PendingQueue.Tests(); SidebarTests(); KimaiServiceTests.Run().GetAwaiter().GetResult(); if (HitMode(1,12)!=1 || HitMode(6,12)!=0 || HitMode(11,12)!=2 || Snap(63)!=65 || Snap(62)!=60 || Snap(5)!=5 || RoundDelta(-6)!=-5 || ResizeDuration(1435,5,10)!=5 || ResizeDuration(540,10,-20)!=5 || !ValidTime(TimeSpan.FromHours(9)+TimeSpan.FromMinutes(5),5) || ValidTime(TimeSpan.FromHours(9)+TimeSpan.FromMinutes(1),5) || ValidTime(TimeSpan.FromHours(23)+TimeSpan.FromMinutes(55),10) || Snap(-1)!=0 || Monday(new DateTime(2026,9,20))!=new DateTime(2026,9,14)) Environment.Exit(1); return; }
+  if (args.Contains("--self-test")) { ReportTests.Run().GetAwaiter().GetResult(); CommentStatistics.Tests(); PortableToken.Tests(); AccountProfile.Tests(); BlockOperations.Tests(); CalendarRules.Tests(); PendingQueue.Tests(); SidebarTests(); KimaiServiceTests.Run().GetAwaiter().GetResult(); if (HitMode(1,12)!=1 || HitMode(6,12)!=0 || HitMode(11,12)!=2 || Snap(63)!=65 || Snap(62)!=60 || Snap(5)!=5 || RoundDelta(-6)!=-5 || ResizeDuration(1435,5,10)!=5 || ResizeDuration(540,10,-20)!=5 || !ValidTime(TimeSpan.FromHours(9)+TimeSpan.FromMinutes(5),5) || ValidTime(TimeSpan.FromHours(9)+TimeSpan.FromMinutes(1),5) || ValidTime(TimeSpan.FromHours(23)+TimeSpan.FromMinutes(55),10) || Snap(-1)!=0 || Monday(new DateTime(2026,9,20))!=new DateTime(2026,9,14)) Environment.Exit(1); return; }
   if(args.Contains("--render")) { var app=new Application();var window=new Blocks(true);window.state.Folders.Add("開発案件");window.state.ProjectFolders[Projects[0]]="開発案件";window.state.ProjectFolders[Projects[1]]="開発案件";window.state.Collapsed.Add("project:"+Projects[1]);window.Populate();window.state.Entries.Add(new Entry { Project=Projects[0], Activity="レビュー", Start=window.week.AddHours(10).AddMinutes(35), Minutes=5 });var view=(FrameworkElement)window.Content;view.Width=1320;view.Height=900;view.Measure(new Size(1320,900));view.Arrange(new Rect(0,0,1320,900));window.Render();view.UpdateLayout();window.calendarScroll.ScrollToVerticalOffset(8*Hour);view.UpdateLayout();var bmp=new System.Windows.Media.Imaging.RenderTargetBitmap(1320,900,96,96,PixelFormats.Pbgra32);bmp.Render(view);var png=new System.Windows.Media.Imaging.PngBitmapEncoder();png.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bmp));using(var f=File.Create(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"preview.png")))png.Save(f);return; }
   new Application().Run(new Blocks());
  }
@@ -139,7 +139,14 @@ public partial class Blocks : Window {
   var box=new Border { Width=Math.Max(12,width-3),Height=en.Minutes/60.0*Hour,Background=BrushOf(ColorFor(en.Project)),BorderBrush=en==selected?BrushOf("#1769AA"):BrushOf("#FFFFFF"),BorderThickness=new Thickness(en==selected?2:1),CornerRadius=new CornerRadius(5),ClipToBounds=true,ToolTip=(en.ReadOnlyReason==null?"":"読み取り専用: "+en.ReadOnlyReason+"\n")+en.Project+" / "+en.Activity+"\n"+BlockTime(en)+"\n"+en.Note };
   Canvas.SetLeft(box,Gutter+day*DayWidth+3+lane*width);Canvas.SetTop(box,top);board.Children.Add(box);
   var content=new Grid();box.Child=content;
-  var text=Label(BlockTime(en)+"\n"+en.Project+"\n"+en.Activity,11);text.VerticalAlignment=VerticalAlignment.Top;text.Margin=new Thickness(4,en.Minutes<=10?0:7,3,0);if(en.Minutes<=10) {text.FontSize=9;text.Text=BlockTime(en);}else text.TextWrapping=TextWrapping.Wrap;text.IsHitTestVisible=false;content.Children.Add(text);
+  var text=Label("",11);text.VerticalAlignment=VerticalAlignment.Top;text.IsHitTestVisible=false;text.TextTrimming=TextTrimming.CharacterEllipsis;content.Children.Add(text);
+  void UpdateBlockText(Entry entry) {
+   bool compact=entry.Minutes<=10;
+   text.FontSize=compact?9:11;text.Margin=new Thickness(4,compact?0:7,3,0);text.TextWrapping=compact?TextWrapping.NoWrap:TextWrapping.Wrap;
+   text.MaxHeight=Math.Max(0,box.Height-text.Margin.Top-box.BorderThickness.Top-box.BorderThickness.Bottom);
+   text.Text=BlockTime(entry)+(compact?"":"\n"+entry.Project+"\n"+entry.Activity+(string.IsNullOrWhiteSpace(entry.Note)?"":"\n"+entry.Note.Trim()));
+  }
+  UpdateBlockText(en);
   Entry before=en.Copy();DateTime original=en.Start;int duration=en.Minutes;Point origin=new Point();bool moved=false,copyDrag=false;Entry dragEntry=en.Copy();int mode=0;
   box.MouseLeftButtonDown+=(s,e)=>{if(!CanEdit(en)){e.Handled=true;return;}if(e.ClickCount==2){Edit(en);e.Handled=true;return;}selected=en;statisticsDay=en.Start.Date;RenderStatistics(VisibleEntries());before=en.Copy();original=en.Start;duration=en.Minutes;origin=e.GetPosition(board);double y=e.GetPosition(box).Y;copyDrag=(Keyboard.Modifiers&ModifierKeys.Control)!=0;mode=copyDrag?0:HitMode(y,box.ActualHeight);dragEntry=en.Copy();moved=false;dragActive=true;box.CaptureMouse();e.Handled=true;};
   box.MouseMove+=(s,e)=>{
@@ -150,7 +157,7 @@ public partial class Blocks : Window {
    if(mode==0){int d=Math.Max(0,Math.Min(DisplayDayCount-1,(int)((p.X-Gutter)/DayWidth)));int minute=Math.Max(0,Math.Min(1440-duration,(int)original.TimeOfDay.TotalMinutes+delta));dragEntry.Start=week.AddDays(d).AddMinutes(minute);}
    else if(mode==1){int shift=Math.Max(-(int)original.TimeOfDay.TotalMinutes,Math.Min(duration-SlotMinutes,delta));dragEntry.Start=original.AddMinutes(shift);dragEntry.Minutes=duration-shift;}
    else dragEntry.Minutes=ResizeDuration((int)original.TimeOfDay.TotalMinutes,duration,delta);
-   Canvas.SetTop(box,dragEntry.Start.TimeOfDay.TotalHours*Hour);Canvas.SetLeft(box,Gutter+(dragEntry.Start.Date-week).Days*DayWidth+3+lane*width);box.Height=dragEntry.Minutes/60.0*Hour;text.Text=BlockTime(dragEntry)+"\n"+en.Project+"\n"+en.Activity;
+   Canvas.SetTop(box,dragEntry.Start.TimeOfDay.TotalHours*Hour);Canvas.SetLeft(box,Gutter+(dragEntry.Start.Date-week).Days*DayWidth+3+lane*width);box.Height=dragEntry.Minutes/60.0*Hour;UpdateBlockText(dragEntry);
   };
   box.MouseLeftButtonUp+=async(s,e)=>{if(box.IsMouseCaptured){dragActive=false;box.ReleaseMouseCapture();e.Handled=true;if(moved)await FinishBlockDrag(en,before,dragEntry,copyDrag,mode);else Render();}};
   box.LostMouseCapture+=(s,e)=>{if(dragActive){dragActive=false;Render();}};
@@ -163,9 +170,8 @@ public partial class Blocks : Window {
   var w=new Window {Title="実績を編集",Width=380,Height=570,Owner=this,WindowStartupLocation=WindowStartupLocation.CenterOwner,ResizeMode=ResizeMode.NoResize};var panel=new StackPanel {Margin=new Thickness(22)};w.Content=panel;
   var project=new ComboBox {ItemsSource=Projects,SelectedItem=en.Project};var activity=new ComboBox {ItemsSource=ActivitiesFor(en.Project),SelectedItem=en.Activity};var date=new DatePicker {SelectedDate=en.Start.Date};var start=new TextBox {Text=en.Start.ToString("HH:mm")};var minutes=new TextBox {Text=en.Minutes.ToString()};var note=new TextBox {Text=en.Note,Height=65,AcceptsReturn=true};
   project.SelectionChanged+=(s,e)=>{activity.ItemsSource=ActivitiesFor((string)project.SelectedItem);activity.SelectedIndex=0;};
-  string[] labels={"プロジェクト","アクティビティ","日付（未来も入力できます）","開始時刻 HH:mm","時間（分・5分単位）","メモ"};Control[] fields={project,activity,date,start,minutes,note};for(int i=0;i<fields.Length;i++){panel.Children.Add(Label(labels[i],12));panel.Children.Add(fields[i]);}
-  var billable=new CheckBox {Content="請求対象",IsChecked=en.Billable,Margin=new Thickness(4,10,4,4)};panel.Children.Add(billable);
-  panel.Children.Add(ButtonOf("保存",async()=>{TimeSpan t;int m;if(project.SelectedItem==null||activity.SelectedItem==null||!date.SelectedDate.HasValue||!TimeSpan.TryParse(start.Text,out t)||!int.TryParse(minutes.Text,out m)||!ValidTime(t,m)){MessageBox.Show(w,"時刻と時間は5分単位で、終了は当日24:00までに設定してください。");return;}en.Project=(string)project.SelectedItem;en.Activity=(string)activity.SelectedItem;en.Start=date.SelectedDate.Value.Date+t;en.Minutes=m;en.Note=note.Text;en.BillableOverride=en.BillableOverride||en.Billable!=(billable.IsChecked==true);en.Billable=billable.IsChecked==true;if(!AssignIds(en))return;w.Close();await CommitEntry(en,before);}));w.ShowDialog();
+  string[] labels={"プロジェクト","アクティビティ","日付（未来も入力できます）","開始時刻 HH:mm","時間（分・5分単位）","コメント"};Control[] fields={project,activity,date,start,minutes,note};for(int i=0;i<fields.Length;i++){panel.Children.Add(Label(labels[i],12));panel.Children.Add(fields[i]);}
+  panel.Children.Add(ButtonOf("保存",async()=>{TimeSpan t;int m;if(project.SelectedItem==null||activity.SelectedItem==null||!date.SelectedDate.HasValue||!TimeSpan.TryParse(start.Text,out t)||!int.TryParse(minutes.Text,out m)||!ValidTime(t,m)){MessageBox.Show(w,"時刻と時間は5分単位で、終了は当日24:00までに設定してください。");return;}en.Project=(string)project.SelectedItem;en.Activity=(string)activity.SelectedItem;en.Start=date.SelectedDate.Value.Date+t;en.Minutes=m;en.Note=note.Text;if(!AssignIds(en))return;w.Close();await CommitEntry(en,before);}));w.ShowDialog();
  }
 }
 

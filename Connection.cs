@@ -54,10 +54,12 @@ public partial class Blocks {
   var menu=new Menu {Background=Brushes.Transparent,VerticalAlignment=VerticalAlignment.Center};
   var item=new MenuItem {Header="メニュー",Foreground=Brushes.White};
   var create=new MenuItem {Header="プロジェクト追加…",Foreground=Brushes.Black};create.Click+=async(s,e)=>await ProjectDialog();item.Items.Add(create);
-  var calendar=new MenuItem {Header="休日・休み時間…",Foreground=Brushes.Black};calendar.Click+=(s,e)=>CalendarDialog();item.Items.Add(calendar);menu.Items.Add(item);buttons.Children.Add(menu);
+  var calendar=new MenuItem {Header="休日・休み時間・時間外…",Foreground=Brushes.Black};calendar.Click+=(s,e)=>CalendarDialog();item.Items.Add(calendar);menu.Items.Add(item);buttons.Children.Add(menu);
   var config=new MenuItem {Header="設定…",Foreground=Brushes.Black};config.Click+=(s,e)=>ConnectionDialog();item.Items.Add(config);
   var reset=new MenuItem {Header="バックアップを破棄してサーバーから再取得…",Foreground=Brushes.Black};reset.Click+=async(s,e)=>await ResetFromServer();item.Items.Add(reset);
   var update=new MenuItem {Header="アップデートを確認",Foreground=Brushes.Black};update.Click+=async(s,e)=>await CheckUpdates(true);item.Items.Add(update);
+  var serverStats=new MenuItem {Header="サーバー実績集計（全ユーザー）…",Foreground=Brushes.Black};serverStats.Click+=(s,e)=>ShowServerReports();item.Items.Add(serverStats);
+  var detailStats=new MenuItem {Header="コメント別の詳細集計…",Foreground=Brushes.Black};detailStats.Click+=(s,e)=>ShowDetailedStatistics();item.Items.Add(detailStats);
   var stats=new MenuItem {Header="右の統計パネルを表示／非表示",Foreground=Brushes.Black};stats.Click+=(s,e)=>SetStatisticsVisible(!settings.ShowStatistics);item.Items.Add(stats);
   buttons.Children.Add(ButtonOf("再読込",async()=>await RefreshRemote()));
   buttons.Children.Add(ButtonOf("今すぐ保存",async()=>await FlushAsync(true)));
@@ -222,6 +224,6 @@ public partial class Blocks {
   }catch(Exception ex){MessageBox.Show(progressWindow,SafeError(ex),"保存結果の確認失敗");return false;}
   finally {EndProgress();Render();}
  }
- internal static bool SameValues(Entry a,Entry b)=>a.ProjectId==b.ProjectId&&a.ActivityId==b.ActivityId&&a.Start==b.Start&&a.Minutes==b.Minutes&&(a.Note??"")==(b.Note??"")&&a.Billable==b.Billable;
+ internal static bool SameValues(Entry a,Entry b)=>a.ProjectId==b.ProjectId&&a.ActivityId==b.ActivityId&&a.Start==b.Start&&a.Minutes==b.Minutes&&(a.Note??"")==(b.Note??"");
  void StoreSettings() {PortableToken.Migrate(settings,DataDirectory);Directory.CreateDirectory(DataDirectory);File.WriteAllText(SettingsFile+".tmp",JsonSerializer.Serialize(settings));File.Move(SettingsFile+".tmp",SettingsFile,true);}
 }

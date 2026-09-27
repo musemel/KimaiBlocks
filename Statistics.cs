@@ -18,6 +18,7 @@ public partial class Blocks {
   statisticsPanel=panel;
   var close=ButtonOf("×",()=>SetStatisticsVisible(false));close.HorizontalAlignment=HorizontalAlignment.Right;close.ToolTip="統計を閉じる（メニューから再表示）";DockPanel.SetDock(close,Dock.Top);panel.Children.Add(close);
   DockPanel.SetDock(panel,Dock.Right);root.Children.Add(panel);
+  var detail=ButtonOf("コメント別の詳細集計…",ShowDetailedStatistics);DockPanel.SetDock(detail,Dock.Top);panel.Children.Add(detail);
   var heading=Label("実績の統計",17);heading.Margin=new Thickness(12,12,12,8);DockPanel.SetDock(heading,Dock.Top);panel.Children.Add(heading);
   var note=Label("未保存・未来の実績を含むブロック時間の合計\n重複時間も加算 · 時間換算は小数2桁まで",10);note.TextWrapping=TextWrapping.Wrap;note.Foreground=BrushOf("#63758A");note.Margin=new Thickness(12,8,12,12);DockPanel.SetDock(note,Dock.Bottom);panel.Children.Add(note);
   statisticsTabs=new TabControl {BorderThickness=new Thickness(0),Margin=new Thickness(6,0,6,0)};
@@ -42,13 +43,13 @@ public partial class Blocks {
    button.HorizontalContentAlignment=HorizontalAlignment.Left;button.Padding=new Thickness(6,4,6,4);weekStatistics.Children.Add(button);
    weekStatistics.Children.Add(new ProgressBar {Minimum=0,Maximum=maximum,Value=minutes,Height=3,Foreground=BrushOf("#4F92CA"),Background=BrushOf("#EDF2F7"),Margin=new Thickness(4,0,4,3)});
   }
-  AddBreakdown(weekStatistics,"プロジェクト別",entries,e=>e.Project,true);
+
   var dayPicker=new ComboBox {Margin=new Thickness(4,6,4,8),Padding=new Thickness(6),ItemsSource=Enumerable.Range(0,7).Select(d=>week.AddDays(d).ToString("M/d (ddd)")).ToArray(),SelectedIndex=(statisticsDay-week).Days};
   dayPicker.SelectionChanged+=(s,e)=>{if(dayPicker.SelectedIndex<0)return;statisticsDay=week.AddDays(dayPicker.SelectedIndex);RenderStatistics(VisibleEntries());};
   dayStatistics.Children.Add(dayPicker);
   var dayEntries=entries.Where(e=>e.Start.Date==statisticsDay).ToList();AddTotal(dayStatistics,dayEntries);
-  AddBreakdown(dayStatistics,"プロジェクト別",dayEntries,e=>e.Project,true);
-  AddBreakdown(dayStatistics,"アクティビティ別",dayEntries,e=>e.Activity,false);
+
+  dayStatistics.Children.Add(ButtonOf("コメント別の詳細集計…",ShowDetailedStatistics));
  }
  void SetStatisticsVisible(bool visible) {
   settings.ShowStatistics=visible;
@@ -69,17 +70,5 @@ public partial class Blocks {
  void AddTotal(StackPanel panel,List<Entry> entries) {
   var value=Label(Hours(entries.Sum(e=>e.Minutes)),30);value.FontWeight=FontWeights.SemiBold;value.Foreground=BrushOf("#1971C2");panel.Children.Add(value);
   panel.Children.Add(Label(entries.Count+" ブロック · "+entries.Sum(e=>e.Minutes)+" 分",11));
- }
- void AddBreakdown(StackPanel panel,string title,List<Entry> entries,Func<Entry,string> key,bool project) {
-  var heading=Label(title,13);heading.Margin=new Thickness(4,16,4,6);heading.FontWeight=FontWeights.SemiBold;panel.Children.Add(heading);
-  if(entries.Count==0){panel.Children.Add(Label("実績なし",12));return;}
-  int totalMinutes=entries.Sum(e=>e.Minutes);
-  foreach(var group in entries.GroupBy(key).OrderByDescending(g=>g.Sum(e=>e.Minutes)).ThenBy(g=>g.Key)) {
-   int minutes=group.Sum(e=>e.Minutes);
-   var row=new DockPanel {Margin=new Thickness(4,5,4,2)};
-   var amount=Label(Hours(minutes),12);amount.Margin=new Thickness(6,0,0,0);DockPanel.SetDock(amount,Dock.Right);row.Children.Add(amount);
-   var name=Label(group.Key??"未設定",12);name.Margin=new Thickness(0);name.TextTrimming=TextTrimming.CharacterEllipsis;name.ToolTip=group.Key;row.Children.Add(name);panel.Children.Add(row);
-   panel.Children.Add(new ProgressBar {Minimum=0,Maximum=Math.Max(1,totalMinutes),Value=minutes,Height=4,Foreground=project?BrushOf(ColorFor(group.Key)):BrushOf("#4F92CA"),Background=BrushOf("#EDF2F7"),Margin=new Thickness(4,0,4,5)});
-  }
  }
 }

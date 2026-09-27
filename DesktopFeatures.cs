@@ -11,6 +11,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 
 public sealed class DistributionDefaults {
+ public CalendarRules Calendar {get;set;}=new CalendarRules();
  public string Url {get;set;}="";
  public int SaveSeconds {get;set;}=60;
  public int CatalogMinutes {get;set;}=60;
@@ -33,6 +34,7 @@ public partial class Blocks {
  void LoadDefaults() {
   string path=Path.Combine(AppContext.BaseDirectory,"defaults.json");if(!File.Exists(path))return;
   var value=JsonSerializer.Deserialize<DistributionDefaults>(File.ReadAllText(path),new JsonSerializerOptions {PropertyNameCaseInsensitive=true})??new DistributionDefaults();
+  var calendar=value.Calendar??new CalendarRules();calendar.Intervals();calendar.HolidayDates();settings.Calendar=calendar;
   settings.Url=value.Url??"";settings.SaveSeconds=Math.Clamp(value.SaveSeconds,10,3600);settings.CatalogMinutes=Math.Clamp(value.CatalogMinutes,1,1440);settings.UpdateFolder=value.UpdateFolder??"";
  }
  bool checkingUpdates;

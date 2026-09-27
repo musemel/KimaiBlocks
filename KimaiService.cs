@@ -23,7 +23,6 @@ public sealed class LocalTimesheetForm : TimesheetEditForm {
   writer.WriteStringValue("begin",KimaiService.LocalDate(LocalBegin));
   writer.WriteStringValue("end",KimaiService.LocalDate(LocalEnd));
   writer.WriteStringValue("description",Description ?? "");
-  if(Billable.HasValue)writer.WriteBoolValue("billable",Billable);
   if(Tags!=null)writer.WriteStringValue("tags",Tags);
 
  }
@@ -46,8 +45,7 @@ public sealed class KimaiHttpGuard : DelegatingHandler {
     try {
      using(var json=JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false))) {
       if(json.RootElement.ValueKind==JsonValueKind.Object&&json.RootElement.TryGetProperty("errors",out var errors)&&errors.ValueKind==JsonValueKind.Object&&errors.TryGetProperty("children",out var children)) {
-       bool billableRejected=request.Content!=null&&(await request.Content.ReadAsStringAsync(ct).ConfigureAwait(false)).Contains("\"billable\"")&&!children.TryGetProperty("billable",out _);
-       response.Dispose();throw new KimaiFailure(billableRejected?"このユーザーには請求対象を変更する権限がありません。請求対象を元に戻して保存してください。":"Kimaiが入力を受け付けませんでした。編集権限・期間・重複・必須項目を確認してください。");
+       response.Dispose();throw new KimaiFailure("Kimaiが入力を受け付けませんでした。編集権限・期間・重複・必須項目を確認してください。");
       }
      }
     }catch(JsonException){}
@@ -63,7 +61,7 @@ public sealed class KimaiHttpGuard : DelegatingHandler {
   throw new KimaiFailure("HTTP "+code+": "+detail,code>=500 && request.Method!=HttpMethod.Get);
  }
 }
-public sealed class KimaiService : IDisposable {
+public sealed partial class KimaiService : IDisposable {
  readonly HttpClient http;
  readonly KimaiHttpGuard guard;
  readonly HttpClientRequestAdapter adapter;
@@ -123,8 +121,8 @@ public sealed class KimaiService : IDisposable {
   }
   return customers.Values.OrderBy(c=>c.Name).ToList();
  }
- public async Task<ProjectEntity> CreateGlobalProjectAsync(int customer,string name,string comment,bool billable) {
-  var result=await client.Api.Projects.PostAsync(new ProjectEditForm {Customer=customer,Name=name,Comment=comment,Visible=true,Billable=billable,GlobalActivities=true});
+ public async Task<ProjectEntity> CreateGlobalProjectAsync(int customer,string name,string comment) {
+  var result=await client.Api.Projects.PostAsync(new ProjectEditForm {Customer=customer,Name=name,Comment=comment,Visible=true,GlobalActivities=true});
   if(result?.Id==null)throw new KimaiFailure("プロジェクトの作成結果が不明です。再読込してください。",true);
   return result;
  }
@@ -175,7 +173,7 @@ public sealed class KimaiService : IDisposable {
   var p=Projects.FirstOrDefault(x=>x.Id==edited.ProjectId);
   if(p==null||p.Visible==false||!ForProject(edited.ProjectId).Any(a=>a.Id==edited.ActivityId))throw new KimaiFailure("選択したプロジェクト・アクティビティは現在利用できません。再読込してください。");
   var prior=old?.RemoteId>0?await CheckCurrentAsync(old):null;
-  var form=new LocalTimesheetForm {Project=edited.ProjectId,Activity=edited.ActivityId,LocalBegin=edited.Start,LocalEnd=edited.Start.AddMinutes(edited.Minutes),Description=edited.Note,Billable=prior==null?(edited.BillableOverride?(bool?)edited.Billable:null):(edited.Billable!=(prior.Billable??false)?(bool?)edited.Billable:null)};
+  var form=new LocalTimesheetForm {Project=edited.ProjectId,Activity=edited.ActivityId,LocalBegin=edited.Start,LocalEnd=edited.Start.AddMinutes(edited.Minutes),Description=edited.Note};
   try {
    var response=prior==null?await client.Api.Timesheets.PostAsync(form):await client.Api.Timesheets[edited.RemoteId.ToString()].PatchAsync(form);
    if(response==null||response.Id==null||response.User!=Me.Id)throw new KimaiFailure("保存結果を確認できません。再読込してください。",true);

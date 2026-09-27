@@ -29,11 +29,10 @@ public partial class Blocks {
   var name=new TextBox {Padding=new Thickness(6),MaxLength=150};
   var comment=new TextBox {Height=60,AcceptsReturn=true,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
   var folder=new ComboBox {ItemsSource=new[]{"（フォルダ外）"}.Concat(state.Folders).ToArray(),SelectedIndex=0,Padding=new Thickness(6)};
-  var billable=new CheckBox {Content="請求対象のプロジェクト",IsChecked=true,Margin=new Thickness(4,12,4,8)};
   panel.Children.Add(Label("追加先の顧客（入力で検索して選択）",12));panel.Children.Add(customer);
   panel.Children.Add(Label("プロジェクト名",12));panel.Children.Add(name);
   panel.Children.Add(Label("説明",12));panel.Children.Add(comment);
-  panel.Children.Add(Label("このクライアントの表示フォルダ",12));panel.Children.Add(folder);panel.Children.Add(billable);
+  panel.Children.Add(Label("このクライアントの表示フォルダ",12));panel.Children.Add(folder);
   var info=Label("グローバルアクティビティを有効にして作成します。\nプロジェクト専用アクティビティは作成しません。\nフォルダ分類はこのクライアントだけに保存されます。",12);info.TextWrapping=TextWrapping.Wrap;panel.Children.Add(info);
   var consent=new CheckBox {Content="顧客・プロジェクト名・追加先フォルダを確認しました",Margin=new Thickness(4,12,4,8)};panel.Children.Add(consent);
   bool sending=false,submitted=false;w.Closing+=(s,e)=>{if(sending)e.Cancel=true;};
@@ -42,7 +41,7 @@ public partial class Blocks {
    var chosen=customer.SelectedItem as CustomerOption;string projectName=name.Text.Trim();
    if(chosen==null||projectName.Length==0||consent.IsChecked!=true){MessageBox.Show(w,"顧客を一覧から選択し、プロジェクト名を入力して、確認チェックを付けてください。","入力確認");return;}
    string folderName=folder.SelectedIndex<=0?null:(string)folder.SelectedItem;
-   string summary="接続先: "+service.BaseUrl+"\n顧客: "+chosen+"\nプロジェクト: "+projectName+"\nフォルダ: "+(folderName??"フォルダ外")+"\nグローバルアクティビティ: 有効\n請求対象: "+(billable.IsChecked==true?"はい":"いいえ")+"\n説明: "+comment.Text;
+   string summary="接続先: "+service.BaseUrl+"\n顧客: "+chosen+"\nプロジェクト: "+projectName+"\nフォルダ: "+(folderName??"フォルダ外")+"\nグローバルアクティビティ: 有効\n説明: "+comment.Text;
    if(MessageBox.Show(w,summary+"\n\nこの内容で作成へ進みますか？","作成内容の確認（1/2）",MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)!=MessageBoxResult.Yes)return;
    if(MessageBox.Show(w,"最終確認（2/2）\n\n「"+chosen.Name+"」に「"+projectName+"」を作成します。\n定期保存を待たずにサーバーへ送信します。\n実行してよろしいですか？","プロジェクトを作成しますか",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes)return;
    sending=true;panel.IsEnabled=false;SetCommunicating(true);ProjectEntity created=null;
@@ -50,7 +49,7 @@ public partial class Blocks {
     await service.ReloadCatalogAsync();
     if(service.Projects.Any(p=>p.Customer==chosen.Id&&string.Equals(p.Name,projectName,StringComparison.OrdinalIgnoreCase)))throw new ArgumentException("同じ顧客に同名のプロジェクトがあります。名前を変更してください。");
     submitted=true;
-    created=await service.CreateGlobalProjectAsync(chosen.Id,projectName,comment.Text,billable.IsChecked==true);
+    created=await service.CreateGlobalProjectAsync(chosen.Id,projectName,comment.Text);
     string label=projectName+" [#"+created.Id.Value+"]";
     if(folderName!=null)state.ProjectFolders[label]=folderName;
     state.Hidden.Remove(label);Persist();

@@ -2,5 +2,16 @@
   "Url": "",
   "SaveSeconds": 60,
   "CatalogMinutes": 60,
-  "UpdateFolder": ""
+  "UpdateFolder": "",
+  "Calendar": {
+    "DaysOff": [
+      0,
+      6
+    ],
+    "Holidays": "",
+    "Breaks": "12:00-13:00",
+    "OffHours": "00:00-09:00\n18:00-24:00",
+    "Shade": true,
+    "BlockInput": false
+  }
 }

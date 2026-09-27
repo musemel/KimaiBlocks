@@ -52,7 +52,7 @@ public partial class Blocks {
   var options=new WrapPanel();options.Children.Add(Label("保存間隔（秒、10〜3600）",12));options.Children.Add(seconds);options.Children.Add(Label("一覧キャッシュ（分、1〜1440）",12));options.Children.Add(minutes);bottom.Children.Add(options);
   bottom.Children.Add(Label("アップデート確認フォルダ（空欄で無効・UNCパス可）",12));var updateFolder=new TextBox {Text=settings.UpdateFolder,Margin=new Thickness(4)};bottom.Children.Add(updateFolder);
   var weekends=new CheckBox {Content="カレンダーに土日を表示",IsChecked=settings.ShowWeekends,Margin=new Thickness(4,12,4,8)};bottom.Children.Add(weekends);
-  bottom.Children.Add(ButtonOf("休日・休み時間の設定…",CalendarDialog));
+  bottom.Children.Add(ButtonOf("休日・休み時間・時間外の設定…",CalendarDialog));
   var note=Label("一覧からアカウントを選んで「選択したアカウントで保存して接続」を押してください。\nBearer認証ではAPIトークンが接続ユーザーを決定します。ユーザー名は管理用の表示です。\nトークン入力は表示されます。AppDataのフォルダ全体をコピーして設定を移行できます。",12);note.TextWrapping=TextWrapping.Wrap;bottom.Children.Add(note);
   var heading=Label("接続アカウント",17);DockPanel.SetDock(heading,Dock.Top);panel.Children.Add(heading);
   var actions=new StackPanel {Orientation=Orientation.Horizontal};DockPanel.SetDock(actions,Dock.Top);panel.Children.Add(actions);

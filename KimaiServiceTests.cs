@@ -15,7 +15,7 @@ public sealed class MockKimai : HttpMessageHandler {
  public List<string> Methods=new List<string>();
  public List<string> Queries=new List<string>();
  public string LastBody;
- public bool GeneralUser,ValidationWithSuccessStatus;
+ public bool GeneralUser,ValidationWithSuccessStatus,RejectValidation;
  public bool Legacy,Paginated,HeaderPagination,Conflict,FailWrite,TimeoutWrite;
  protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken token) {
   if(!request.RequestUri.AbsolutePath.StartsWith("/kimai/api/"))throw new Exception("Subdirectory lost");
@@ -27,7 +27,8 @@ public sealed class MockKimai : HttpMessageHandler {
    if(FailWrite)return Reply("{}",HttpStatusCode.InternalServerError);
    if(request.Method==HttpMethod.Delete)return new HttpResponseMessage(HttpStatusCode.NoContent);
    LastBody=await request.Content.ReadAsStringAsync(token);var body=JsonNode.Parse(LastBody);var rec=JsonNode.Parse(Record);
-   if(GeneralUser&&new[]{"billable","exported","fixedRate","hourlyRate"}.Any(k=>body.AsObject().ContainsKey(k)))return Reply("{\"code\":400,\"message\":\"Validation Failed\",\"errors\":{\"errors\":[\"This form should not contain extra fields.\"],\"children\":{\"begin\":{},\"end\":{},\"project\":{},\"activity\":{},\"description\":{},\"tags\":{}}}}",ValidationWithSuccessStatus?HttpStatusCode.OK:HttpStatusCode.BadRequest);
+   if(RejectValidation||GeneralUser&&new[]{"billable","exported","fixedRate","hourlyRate"}.Any(k=>body.AsObject().ContainsKey(k)))return Reply("{\"code\":400,\"message\":\"Validation Failed\",\"errors\":{\"errors\":[\"This form should not contain extra fields.\"],\"children\":{\"begin\":{},\"end\":{},\"project\":{},\"activity\":{},\"description\":{},\"tags\":{}}}}",ValidationWithSuccessStatus?HttpStatusCode.OK:HttpStatusCode.BadRequest);
+   if(path.EndsWith("/projects")){body["id"]=13;return Reply(body.ToJsonString(),HttpStatusCode.Created);}
    foreach(var key in new[]{"project","activity","description","billable","exported"})if(body.AsObject().ContainsKey(key))rec[key]=body[key]?.DeepClone();
    rec["begin"]=body["begin"].GetValue<string>()+"+09:00";rec["end"]=body["end"].GetValue<string>()+"+09:00";
    Record=rec.ToJsonString();return Reply(Record,request.Method==HttpMethod.Post?HttpStatusCode.Created:HttpStatusCode.OK);
@@ -77,9 +78,12 @@ public static class KimaiServiceTests {
    await api.InitializeAsync();var baseline=(await api.ReadWeekAsync(new DateTime(2026,9,21))).Single();
    var edit=baseline.Copy();edit.Minutes=10;var saved=await api.WriteAsync(edit,baseline);Check(saved.Minutes==10,"General-user update failed");
    var fresh=BlockOperations.CopyAsNew(saved);await api.WriteAsync(fresh,null);
+   fresh.Billable=false;fresh.BillableOverride=true;await api.WriteAsync(fresh,null);Check(!JsonNode.Parse(general.LastBody).AsObject().ContainsKey("billable"),"Legacy billing override sent");
+   var createdProject=await api.CreateGlobalProjectAsync(1,"Project","Comment");Check(createdProject.Id==13&&!JsonNode.Parse(general.LastBody).AsObject().ContainsKey("billable"),"Project creation sent billing field");
+   general.RejectValidation=true;
    foreach(bool successStatus in new[]{false,true}) {
     general.ValidationWithSuccessStatus=successStatus;fresh.Billable=false;fresh.BillableOverride=true;int calls=general.Methods.Count;bool definitive=false;
-    try {await api.WriteAsync(fresh,null);}catch(KimaiFailure ex){definitive=!ex.Uncertain&&ex.Message.Contains("請求対象");}
+    try {await api.WriteAsync(fresh,null);}catch(KimaiFailure ex){definitive=!ex.Uncertain&&ex.Message.Contains("入力");}
     Check(definitive&&general.Methods.Count==calls+1,"Validation error misclassified or retried");
    }
   }
