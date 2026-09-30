@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Diagnostics;
@@ -43,7 +43,7 @@ public partial class Blocks {
   if(string.IsNullOrWhiteSpace(settings.UpdateFolder)){if(manual)MessageBox.Show(this,"設定でアップデート確認フォルダを指定してください。","アップデート");return;}
   checkingUpdates=true;string folder=settings.UpdateFolder;
   try {
-   var read=Task.Run(()=>{try {string path=Path.Combine(folder,"KimaiBlocks.dll");return (Version:Version.Parse(FileVersionInfo.GetVersionInfo(path).FileVersion),Error:(string)null);}catch(Exception){return (Version:(Version)null,Error:"確認先のKimaiBlocks.dllを読み込めません。パスとアクセス権を確認してください。");}});
+   var read=Task.Run(()=>{try {return (Version:UpdateVersion.Read(folder),Error:(string)null);}catch(Exception){return (Version:(Version)null,Error:"確認先のKimaiBlocks.dll または KimaiBlocks.exe のバージョンを読み込めません。パスとアクセス権を確認してください。");}});
    if(await Task.WhenAny(read,Task.Delay(TimeSpan.FromSeconds(8)))!=read){if(manual)MessageBox.Show(this,"確認がタイムアウトしました。","アップデート");return;}
    var result=await read;
    if(!IsVisible)return;
@@ -67,7 +67,7 @@ public partial class Blocks {
   bool discard=false;panel.Children.Add(ButtonOf("変更を保持して戻る",()=>w.Close()));panel.Children.Add(ButtonOf("未保存変更を破棄…",()=>{if(MessageBox.Show(w,"残っている未保存変更をすべて破棄しますか？この操作は取り消せません。","変更の破棄",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)==MessageBoxResult.Yes){discard=true;w.Close();}}));w.ShowDialog();
   if(!discard)return false;
   var oldEntries=state.Entries.ToList();var oldPending=state.Pending.ToList();bool committed=false;
-  try {RollbackPending(state);Persist();committed=true;needsRefresh=true;savePaused=true;if(file!=null)File.Delete(file+".bak");Render();status.Text="未保存変更を破棄しました。再読込してください。";return true;}
+  try {RollbackPending(state);Persist();ClearHistory();committed=true;needsRefresh=true;savePaused=true;if(file!=null)File.Delete(file+".bak");Render();status.Text="未保存変更を破棄しました。再読込してください。";return true;}
   catch(Exception ex){if(!committed){state.Entries=oldEntries;state.Pending=oldPending;}MessageBox.Show(progressWindow??this,SafeError(ex),committed?"変更は破棄済みですがバックアップを削除できません":"変更の破棄を保存できません");return false;}
  }
  async Task ResetFromServer() {
@@ -83,8 +83,9 @@ public partial class Blocks {
    state.Entries=entries;state.Pending=new System.Collections.Generic.List<PendingChange>();file=target;
    var previous=service;service=candidate;candidate=null;
    try {await RefreshView();Persist();committed=true;}catch {candidate=service;service=previous;throw;}
-   previous?.Dispose();File.Delete(file+".bak");File.Delete(file+".catalog");needsRefresh=false;savePaused=false;ConfigureTimer();selected=null;status.Text="サーバーから再取得しました";Render();
+   ClearHistory();previous?.Dispose();File.Delete(file+".bak");File.Delete(file+".catalog");needsRefresh=false;savePaused=false;ConfigureTimer();selected=null;status.Text="サーバーから再取得しました";Render();
   }catch(Exception ex){if(!committed){file=oldFile;state.Entries=oldEntries;state.Pending=oldPending;Projects=oldProjects;state.Hidden=oldHidden;state.Collapsed=oldCollapsed;}needsRefresh=true;MessageBox.Show(progressWindow,SafeError(ex),"再取得失敗");}
   finally {candidate?.Dispose();EndProgress();Populate();PopulateProjectList();Render();}
  }
 }
+

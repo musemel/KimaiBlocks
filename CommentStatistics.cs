@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -23,9 +23,8 @@ public partial class Blocks {
   var scope=new ComboBox {ItemsSource=new[]{"週全体","日別"},SelectedIndex=statisticsTabs?.SelectedIndex==1?1:0,Width=110,Margin=new Thickness(4),Padding=new Thickness(6)};controls.Children.Add(scope);
   int index=Math.Clamp((statisticsDay-week).Days,0,6);
   var day=new ComboBox {ItemsSource=Enumerable.Range(0,7).Select(d=>week.AddDays(d).ToString("M/d (ddd)")).ToArray(),SelectedIndex=index,Width=150,Margin=new Thickness(4),Padding=new Thickness(6)};controls.Children.Add(day);
-  var grouping=new ComboBox {ItemsSource=new[]{"コメント別","プロジェクト別"},SelectedIndex=0,Width=150,Margin=new Thickness(4),Padding=new Thickness(6)};controls.Children.Add(grouping);
   var totalLabel=Label("",17);top.Children.Add(totalLabel);
-  var note=Label("コメント別／プロジェクト別を選び、内訳をツリーで展開できます。\n未保存・未来・非表示曜日の実績も含み、重複時間も加算します。\n前後の空白と改行コードを除き、コメントが一致する実績をまとめます。",12);note.TextWrapping=TextWrapping.Wrap;top.Children.Add(note);
+  var note=Label("プロジェクト → コメントの階層 → アクティビティ → 実績 の順に展開できます。\n未保存・未来・非表示曜日の実績も含み、重複時間も加算します。\n前後の空白と改行コードを除き、コメントが一致する実績をまとめます。",12);note.TextWrapping=TextWrapping.Wrap;top.Children.Add(note);
   var close=ButtonOf("閉じる",()=>w.Close());DockPanel.SetDock(close,Dock.Bottom);root.Children.Add(close);
   var tree=new TreeView {Margin=new Thickness(4,12,4,4)};VirtualizingPanel.SetIsVirtualizing(tree,true);VirtualizingPanel.SetVirtualizationMode(tree,VirtualizationMode.Recycling);ScrollViewer.SetCanContentScroll(tree,true);root.Children.Add(tree);
   TreeViewItem Node(string name,List<Entry> rows,Func<IEnumerable<TreeViewItem>> children) {
@@ -35,17 +34,19 @@ public partial class Blocks {
   }
   IEnumerable<TreeViewItem> Records(List<Entry> rows)=>rows.OrderBy(e=>e.Start).Select(e=>new TreeViewItem {Header=Label(e.Start.ToString("M/d ")+BlockTime(e),12),ToolTip=e.Note});
   IEnumerable<TreeViewItem> Activities(List<Entry> rows)=>rows.GroupBy(e=>e.Activity).OrderByDescending(g=>g.Sum(e=>e.Minutes)).Select(g=>Node(g.Key??"未設定",g.ToList(),()=>Records(g.ToList())));
-  IEnumerable<TreeViewItem> ProjectsIn(List<Entry> rows)=>rows.GroupBy(e=>e.Project).OrderByDescending(g=>g.Sum(e=>e.Minutes)).Select(g=>Node(g.Key??"未設定",g.ToList(),()=>Activities(g.ToList())));
-  IEnumerable<TreeViewItem> CommentsIn(List<Entry> rows)=>CommentStatistics.Groups(rows).Select(g=>Node(g.Key.Length==0?"（コメントなし）":g.Key,g.ToList(),()=>Records(g.ToList())));
-  IEnumerable<TreeViewItem> ActivitiesWithComments(List<Entry> rows)=>rows.GroupBy(e=>e.Activity).OrderByDescending(g=>g.Sum(e=>e.Minutes)).Select(g=>Node(g.Key??"未設定",g.ToList(),()=>CommentsIn(g.ToList())));
+  IEnumerable<TreeViewItem> CommentsIn(List<Entry> rows,int depth=0) {
+   foreach(var g in rows.GroupBy(e=>{var parts=EditingModel.Path(CommentStatistics.Key(e));return depth<parts.Length?parts[depth]:"（この階層のコメント／コメントなし）";})) {
+    var groupRows=g.ToList();bool deeper=groupRows.Any(e=>EditingModel.Path(CommentStatistics.Key(e)).Length>depth+1);
+    yield return Node(g.Key,groupRows,()=>deeper?CommentsIn(groupRows,depth+1):Activities(groupRows));
+   }
+  }
   void Refresh() {
    day.IsEnabled=scope.SelectedIndex==1;var entries=VisibleEntries();if(scope.SelectedIndex==1)entries=entries.Where(e=>e.Start.Date==week.AddDays(Math.Max(0,day.SelectedIndex))).ToList();
    totalLabel.Text="合計 "+Hours(entries.Sum(e=>e.Minutes))+"  ·  "+entries.Count+"ブロック";tree.Items.Clear();
-   if(grouping.SelectedIndex==1){foreach(var group in entries.GroupBy(e=>e.Project).OrderByDescending(g=>g.Sum(e=>e.Minutes))){var rows=group.ToList();tree.Items.Add(Node(group.Key??"未設定",rows,()=>ActivitiesWithComments(rows)));}}
-   else foreach(var group in CommentStatistics.Groups(entries)){var rows=group.ToList();tree.Items.Add(Node(group.Key.Length==0?"（コメントなし）":group.Key,rows,()=>ProjectsIn(rows)));}
+   foreach(var group in entries.GroupBy(e=>e.Project).OrderByDescending(g=>g.Sum(e=>e.Minutes))){var rows=group.ToList();tree.Items.Add(Node(group.Key??"未設定",rows,()=>CommentsIn(rows)));}
    if(entries.Count==0)tree.Items.Add(new TreeViewItem {Header="実績なし"});
   }
-  grouping.SelectionChanged+=(s,e)=>Refresh();
   scope.SelectionChanged+=(s,e)=>Refresh();day.SelectionChanged+=(s,e)=>Refresh();Refresh();w.ShowDialog();
  }
 }
+

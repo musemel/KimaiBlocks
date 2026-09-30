@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -24,6 +24,8 @@ public partial class Blocks {
     var before=entry.Copy();entry.Minutes=10;await window.CommitEntry(entry,before);
     if(mock.Methods.Any(m=>m.StartsWith("POST")))throw new Exception("Edit sent immediately");
     if(!await window.FlushAsync(false)||window.state.Pending.Count!=0||mock.Methods.Count(m=>m.StartsWith("POST"))!=1)throw new Exception("Batch save failed");
+    window.UndoEdit();if(window.state.Entries.Single().Minutes!=5||window.state.Pending.Single().Original.Minutes!=10)throw new Exception("Saved edit undo failed");
+    window.UndoEdit(true);if(window.state.Entries.Single().Minutes!=10||window.state.Pending.Count!=0)throw new Exception("Saved edit redo failed");
     entry=NewEntry();entry.Start=entry.Start.AddHours(1);window.state.Entries.Add(entry);await window.CommitEntry(entry,null);
     window.saveTimer.Interval=TimeSpan.FromMilliseconds(50);window.saveTimer.Start();await WaitUntil(()=>window.state.Pending.Count==0&&!window.communicating);window.saveTimer.Stop();
     if(mock.Methods.Count(m=>m.StartsWith("POST"))!=2)throw new Exception("Timer failed to flush");
@@ -40,6 +42,7 @@ public partial class Blocks {
     window.Close();await WaitUntil(()=>window.closingApproved&&!window.IsVisible);
     if(window.IsVisible||window.state.Pending.Count!=0)throw new Exception("Successful close did not save");
     Projects=new[]{"A","B","C","D"};var empty=new Blocks(true);empty.Show();empty.demoMode=false;empty.state=new State();empty.file=Path.Combine(testFolder,"empty.json");empty.Close();await WaitUntil(()=>!empty.IsVisible);if(!empty.closingApproved)throw new Exception("Empty close failed");
+    await RunInteractionChecks(testFolder);
     Console.WriteLine("PASS: batching, periodic timer, no immediate POST, cache persistence, uncertain non-retry, failure blocks close, successful close flushes.");
     app.Shutdown(0);
    }catch(Exception ex){Console.Error.WriteLine(ex);if(window!=null){window.closingApproved=true;window.Close();}app.Shutdown(1);}
@@ -52,4 +55,5 @@ public partial class Blocks {
   while(!ready()){if(DateTime.UtcNow>deadline)throw new Exception("Async lifecycle timeout");await Task.Delay(20);}
  }
 }
+
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -90,4 +90,5 @@ public static class KimaiServiceTests {
   using(var legacy=new KimaiService("https://kimai.test/kimai","test-only-token","test",true,new MockKimai {Legacy=true})){await legacy.InitializeAsync();}
  }
 }
+
 

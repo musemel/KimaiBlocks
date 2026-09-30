@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -55,3 +55,4 @@ public sealed partial class KimaiService {
   result.Retrieved=DateTime.Now;return result;
  }
 }
+

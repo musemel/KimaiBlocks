@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -47,18 +47,7 @@ public static class BlockOperations {
 public partial class Blocks {
  bool dragActive;
  async Task FinishBlockDrag(Entry original,Entry before,Entry desired,bool copy,int mode) {
-  var pieces=BlockOperations.Plan(desired,state.Entries,original,copy);
-  if(pieces.Count==0){MessageBox.Show(this,"操作先に空き時間がないため変更できません。元の実績はそのまま残します。","自動調整");Render();return;}
-  if(pieces.Any(p=>!AcceptSchedule(p,null))){Render();return;}
-  int newStart=0;
-  if(!copy) {
-   RestoreEntry(original,pieces[0]);PendingQueue.Edit(state.Pending,original,before);selected=original;newStart=1;
-  }
-  foreach(var piece in pieces.Skip(newStart)){state.Entries.Add(piece);PendingQueue.Edit(state.Pending,piece,null);}
-  if(copy)selected=pieces[0];
-  Save();Render();
-  int removed=desired.Minutes-pieces.Sum(p=>p.Minutes);
-  status.Text=(copy?"コピー":"時間変更")+" · "+pieces.Count+" 個"+(removed>0?" · 重複 "+removed+" 分を除外":"")+" · 定期保存待ち";
-  await Task.CompletedTask;
+  await ApplyBatchDrag(original==null?new List<Entry>{desired}:new List<Entry>{original},new List<Entry>{desired},copy);
  }
 }
+

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -187,3 +187,4 @@ public sealed partial class KimaiService : IDisposable {
  }
  public void Dispose() {adapter.Dispose();http.Dispose();}
 }
+

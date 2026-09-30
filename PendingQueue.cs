@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
@@ -36,3 +36,4 @@ public static class PendingQueue {
   var same=remote.Copy();if(!Blocks.SameValues(same,remote))throw new Exception("Reconciliation mismatch");same.Minutes+=5;if(Blocks.SameValues(same,remote))throw new Exception("Reconciliation ignored duration");
  }
 }
+

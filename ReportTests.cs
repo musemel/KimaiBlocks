@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -45,3 +45,4 @@ public static class ReportTests {
   Console.WriteLine("PASS: report permissions, paging, all-time/range queries, server durations, zero users, missing durations, partial failure and cancellation.");
  }
 }
+

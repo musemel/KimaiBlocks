@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.Windows;
@@ -17,7 +17,6 @@ public partial class Blocks {
   if(en.RemoteId==0&&!en.BillableOverride)en.Billable=(p.Billable??true)&&(a.Billable??true);
   return true;
  }
- string ColorFor(string project) {return Colors[Math.Max(0,Array.IndexOf(Projects,project))%Colors.Length];}
  List<Entry> VisibleEntries() {
   var result=new List<Entry>();
   foreach(var en in state.Entries) {
@@ -31,3 +30,4 @@ public partial class Blocks {
   return result;
  }
 }
+

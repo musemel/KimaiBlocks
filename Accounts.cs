@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -77,7 +77,7 @@ public partial class Blocks {
     var updated=JsonSerializer.Deserialize<ConnectionSettings>(JsonSerializer.Serialize(settings));
     updated.UpdateFolder=updateFolder.Text.Trim();updated.Accounts=accounts.Select(a=>a.Copy()).ToList();updated.SaveSeconds=sec;updated.CatalogMinutes=min;updated.ShowWeekends=weekends.IsChecked==true;AccountProfile.Select(updated,updated.Accounts.Single(a=>a.Id==account.Id));
     settings=updated;try {StoreSettings();}catch {settings=previous;throw;}
-    service?.Dispose();service=null;needsRefresh=true;savePaused=true;saveTimer.Stop();file=null;state=new State();Projects=Array.Empty<string>();selected=null;connectionBadge.Text="接続待ち: "+account.Name;PopulateProjectList();Populate();Render();
+    service?.Dispose();service=null;needsRefresh=true;savePaused=true;saveTimer.Stop();file=null;clipboardEntries.Clear();ClearHistory();state=new State();Projects=Array.Empty<string>();selected=null;connectionBadge.Text="接続待ち: "+account.Name;PopulateProjectList();Populate();Render();
     w.Close();await ConnectAsync();
    }catch(Exception ex){if(w.IsVisible)MessageBox.Show(w,SafeError(ex),"設定保存失敗");else MessageBox.Show(this,SafeError(ex),"接続失敗");}
   }));
@@ -105,3 +105,4 @@ public partial class Blocks {
   }));panel.Children.Add(ButtonOf("キャンセル",()=>w.Close()));w.ShowDialog();return result;
  }
 }
+

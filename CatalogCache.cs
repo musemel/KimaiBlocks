@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
@@ -34,3 +34,4 @@ public partial class Blocks {
   Directory.CreateDirectory(DataDirectory);await File.WriteAllTextAsync(path+".tmp",JsonSerializer.Serialize(snapshot));File.Move(path+".tmp",path,true);
  }
 }
+

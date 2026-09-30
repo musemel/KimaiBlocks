@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
@@ -24,7 +24,7 @@ public partial class Blocks {
  bool rebuildingTree;
  void BuildSidebar(DockPanel root) {
   var left=new DockPanel {Width=280,Margin=new Thickness(12,0,12,0),Background=Brushes.White};
-  DockPanel.SetDock(left,Dock.Left);root.Children.Add(left);
+  DockPanel.SetDock(left,Dock.Left);root.Children.Add(left);AddPanelResizer(root,left,Dock.Left);
   var filters=new StackPanel {Margin=new Thickness(10)};DockPanel.SetDock(filters,Dock.Top);left.Children.Add(filters);
   filters.Children.Add(ButtonOf("表示プロジェクトを選択…",ShowProjectChoices));
   filters.Children.Add(Label("作業ツリー",17));
@@ -58,13 +58,13 @@ public partial class Blocks {
  void PopulateProjectList() {
   projectList.ItemsSource=Projects.Where(p=>Matches(p,projectSearch.Text)).Select(p=>new ProjectChoice(p,()=>!state.Hidden.Contains(p),enabled=>{
    if(enabled)state.Hidden.Remove(p);else if(!state.Hidden.Contains(p))state.Hidden.Add(p);
-   Save();Populate();
+   Save();Populate();Render();
   })).ToList();
  }
  static bool Matches(string value,string query) {string Clean(string s)=>new string((s??" ").Normalize(NormalizationForm.FormKC).Where(c=>!char.IsWhiteSpace(c)).ToArray());return System.Globalization.CultureInfo.GetCultureInfo("ja-JP").CompareInfo.IndexOf(Clean(value),Clean(query),System.Globalization.CompareOptions.IgnoreCase|System.Globalization.CompareOptions.IgnoreKanaType|System.Globalization.CompareOptions.IgnoreWidth)>=0;}
  string FolderOf(string project) {string f;return state.ProjectFolders.TryGetValue(project,out f)&&state.Folders.Contains(f)?f:null;}
  void Populate() {
-  rebuildingTree=true;
+  RefreshColors();rebuildingTree=true;
   try {
    tree.Items.Clear();
    var root=Node("プロジェクト（フォルダ外）","root",true);root.ContextMenu=FolderMenu(null);MakeFolderTarget((FrameworkElement)root.Header,null);tree.Items.Add(root);
@@ -87,21 +87,26 @@ public partial class Blocks {
  void AddProject(TreeViewItem parent,string project,string folder) {
   var activities=ActivitiesFor(project).Where(a=>(favorites.IsChecked!=true||state.Favorites.Contains(project+"|"+a))&&Matches(project+" "+a+" "+folder,search.Text)).ToList();
   if(activities.Count==0)return;
-  var node=Node("■  "+project,"project:"+project,false);var header=(TextBlock)node.Header;
-  header.Foreground=BrushOf("#254D70");header.Background=BrushOf(ColorFor(project));
-  DragSource(header,"project",project,DragDropEffects.Move);node.ContextMenu=FolderMenu(null);parent.Items.Add(node);
+  var projectParts=EditingModel.Path(project);var projectParent=PathParent(parent,projectParts.Take(Math.Max(0,projectParts.Length-1)),"project-path:"+folder);
+  var node=Node("■  "+(projectParts.LastOrDefault()??project),"project:"+project,false);var header=(TextBlock)node.Header;
+  header.Foreground=ReadableText(ColorFor(project));header.Background=BrushOf(ColorFor(project));header.ToolTip=project;
+  DragSource(header,"project",project,DragDropEffects.Move);node.ContextMenu=FolderMenu(null);projectParent.Items.Add(node);
   bool filled=false;
   Action fill=()=>{if(filled)return;filled=true;node.Items.Clear();
   foreach(var activity in activities) {
    string key=project+"|"+activity;
    var row=new StackPanel {Orientation=Orientation.Horizontal};
-   var name=Label(activity,12);name.MinWidth=90;name.Cursor=Cursors.Hand;name.ToolTip="カレンダーへドラッグして実績を作成";row.Children.Add(name);
+   var activityParts=EditingModel.Path(activity);var activityParent=PathParent(node,activityParts.Take(Math.Max(0,activityParts.Length-1)),"activity-path:"+project);
+   var name=Label(activityParts.LastOrDefault()??activity,12);name.MinWidth=90;name.Cursor=Cursors.Hand;name.ToolTip=activity+"\nカレンダーへドラッグして実績を作成。既存ブロックへドロップすると作業を置換";row.Children.Add(name);
    DragSource(name,"work",System.Text.Json.JsonSerializer.Serialize(new[]{project,activity}),DragDropEffects.Copy);
    var star=ButtonOf(state.Favorites.Contains(key)?"★":"☆",()=>{if(state.Favorites.Contains(key))state.Favorites.Remove(key);else state.Favorites.Add(key);Save();Populate();});
    star.Padding=new Thickness(5,0,5,0);star.Margin=new Thickness(2,0,2,0);star.ToolTip="お気に入りを切り替え";row.Children.Add(star);
-   node.Items.Add(new TreeViewItem {Header=row,ContextMenu=FolderMenu(null)});
+   activityParent.Items.Add(new TreeViewItem {Header=row,ContextMenu=FolderMenu(null)});
   }};
   if(node.IsExpanded)fill();else {node.Items.Add(new TreeViewItem());node.Expanded+=(s,e)=>{if(e.OriginalSource==node)fill();};}
+ }
+ TreeViewItem PathParent(TreeViewItem parent,IEnumerable<string> parts,string prefix) {
+  string path=prefix;foreach(var part in parts){path+="/"+part;var child=parent.Items.OfType<TreeViewItem>().FirstOrDefault(n=>n.Tag as string==path);if(child==null){child=Node(part,path,false);child.Tag=path;parent.Items.Add(child);}parent=child;}return parent;
  }
  void DragSource(FrameworkElement element,string format,string value,DragDropEffects effects) {
   Point start=new Point();bool pressed=false;
@@ -144,4 +149,5 @@ public partial class Blocks {
   if(!Matches("Project A","project")||Matches("Project A","other"))throw new Exception("Search failed");
  }
 }
+
 

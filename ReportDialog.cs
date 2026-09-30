@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -21,6 +21,9 @@ public partial class Blocks {
   var all=new CheckBox {Content="全期間",Margin=new Thickness(12,8,12,4)};
   controls.Children.Add(Label("開始日",12));controls.Children.Add(from);controls.Children.Add(Label("終了日（含む）",12));controls.Children.Add(through);controls.Children.Add(all);
   var fetch=new Button {Content="取得して集計",Padding=new Thickness(12,5,12,5),Margin=new Thickness(4)};controls.Children.Add(fetch);
+  var members=new Button {Content="メンバーを選択…",IsEnabled=false,Margin=new Thickness(4),Padding=new Thickness(8)};controls.Children.Add(members);
+  var blocks=new Button {Content="日／週のブロック表示…",IsEnabled=false,Margin=new Thickness(4),Padding=new Thickness(8)};controls.Children.Add(blocks);
+  ReportSnapshot loadedSnapshot=null;HashSet<int> memberIds=null;
   var cancel=new Button {Content="取得をキャンセル",IsEnabled=false,Margin=new Thickness(4),Padding=new Thickness(12,5,12,5)};top.Children.Add(cancel);cancel.HorizontalAlignment=HorizontalAlignment.Left;
   var progress=new ProgressBar {Height=5,IsIndeterminate=true,Visibility=Visibility.Collapsed,Margin=new Thickness(4)};top.Children.Add(progress);
   var message=Label("期間を選び「取得して集計」を押してください。",12);message.TextWrapping=TextWrapping.Wrap;top.Children.Add(message);
@@ -38,21 +41,28 @@ public partial class Blocks {
   delay.Tick+=(s,e)=>{delay.Stop();Filter();};search.TextChanged+=(s,e)=>{delay.Stop();delay.Start();};tabs.SelectionChanged+=(s,e)=>{if(e.Source==tabs)Filter();};
   cancel.Click+=(s,e)=>pending?.Cancel();
   w.Closing+=(s,e)=>{if(loading){e.Cancel=true;closeAfter=true;pending?.Cancel();}};w.Closed+=(s,e)=>delay.Stop();
-  fetch.Click+=async(s,e)=>{
-   DateTime? first=all.IsChecked==true?null:from.SelectedDate,last=all.IsChecked==true?null:through.SelectedDate;
-   if(all.IsChecked!=true&&(!first.HasValue||!last.HasValue||first>last||last.Value.Date==DateTime.MaxValue.Date)){MessageBox.Show(w,"開始日と終了日を確認してください。");return;}
-   loading=true;controls.IsEnabled=false;cancel.IsEnabled=true;progress.Visibility=Visibility.Visible;tabs.Items.Clear();pending=new CancellationTokenSource();
-   try {
-    var snapshot=await api.ReadReportAsync(first,last,new Progress<string>(text=>message.Text=text),pending.Token);
-    message.Text="テーブルを作成しています…";
-    var tables=await Task.Run(()=>ReportTables.Build(snapshot,pending.Token),pending.Token);pending.Token.ThrowIfCancellationRequested();
+  async Task DisplayTables() {
+   var snapshot=MemberReports.Filter(loadedSnapshot,memberIds);
+    var tables=await Task.Run(()=>ReportTables.Build(snapshot,pending?.Token??CancellationToken.None));pending?.Token.ThrowIfCancellationRequested();
+    tabs.Items.Clear();
     foreach(var table in tables) {
      var grid=new DataGrid {ItemsSource=table.DefaultView,IsReadOnly=true,AutoGenerateColumns=true,CanUserAddRows=false,CanUserDeleteRows=false,EnableRowVirtualization=true,EnableColumnVirtualization=true,ClipboardCopyMode=DataGridClipboardCopyMode.IncludeHeader,SelectionMode=DataGridSelectionMode.Extended,FrozenColumnCount=1};
      grid.AutoGeneratingColumn+=(sender,args)=>{if(args.Column is DataGridTextColumn col&&col.Binding is Binding binding){if(args.PropertyType==typeof(DateTime))binding.StringFormat="yyyy/MM/dd HH:mm:ss";if(args.PropertyType==typeof(decimal))binding.StringFormat="0.####";col.MaxWidth=420;}};
      tabs.Items.Add(new TabItem {Header=table.TableName,Content=grid,Tag=table});
     }
     tabs.SelectedIndex=0;Filter();
-    message.Text=(first.HasValue?first.Value.ToString("yyyy/MM/dd")+" ～ "+last.Value.ToString("yyyy/MM/dd"):"全期間")+" / "+snapshot.Timezone+" / "+snapshot.Records.Count+"件 / 取得 "+snapshot.Retrieved.ToString("HH:mm:ss")+"\n"+snapshot.Notice+"\n列見出しで並べ替え、行選択＋Ctrl+Cでコピーできます。";
+    message.Text=(snapshot.From.HasValue?snapshot.From.Value.ToString("yyyy/MM/dd")+" ～ "+snapshot.Through.Value.ToString("yyyy/MM/dd"):"全期間")+" / "+snapshot.Timezone+" / "+snapshot.Records.Count+"件 / メンバー "+snapshot.Users.Count+"人 / 取得 "+snapshot.Retrieved.ToString("HH:mm:ss")+"\n"+snapshot.Notice;
+  }
+  members.Click+=async(s,e)=>{if(loadedSnapshot==null||loading)return;if(!ChooseMembers(w,loadedSnapshot.Users,memberIds,out var chosen))return;memberIds=chosen;controls.IsEnabled=false;loading=true;cancel.IsEnabled=true;progress.Visibility=Visibility.Visible;pending=new CancellationTokenSource();try{await DisplayTables();}catch(OperationCanceledException){tabs.Items.Clear();message.Text="集計をキャンセルしました。";}catch(Exception ex){tabs.Items.Clear();message.Text="集計できませんでした。再取得してください。";MessageBox.Show(w,SafeError(ex),"集計失敗");}finally{pending.Dispose();pending=null;loading=false;controls.IsEnabled=true;cancel.IsEnabled=false;progress.Visibility=Visibility.Collapsed;if(closeAfter)w.Close();}};
+  blocks.Click+=(s,e)=>{if(loadedSnapshot!=null&&!loading)ShowMemberCalendar(w,MemberReports.Filter(loadedSnapshot,memberIds));};
+  fetch.Click+=async(s,e)=>{
+   DateTime? first=all.IsChecked==true?null:from.SelectedDate,last=all.IsChecked==true?null:through.SelectedDate;
+   if(all.IsChecked!=true&&(!first.HasValue||!last.HasValue||first>last||last.Value.Date==DateTime.MaxValue.Date)){MessageBox.Show(w,"開始日と終了日を確認してください。");return;}
+   loading=true;controls.IsEnabled=false;cancel.IsEnabled=true;progress.Visibility=Visibility.Visible;tabs.Items.Clear();loadedSnapshot=null;members.IsEnabled=blocks.IsEnabled=false;pending=new CancellationTokenSource();
+   try {
+    var snapshot=await api.ReadReportAsync(first,last,new Progress<string>(text=>message.Text=text),pending.Token);
+    message.Text="テーブルを作成しています…";
+    loadedSnapshot=snapshot;await DisplayTables();members.IsEnabled=blocks.IsEnabled=true;
    }catch(OperationCanceledException){message.Text="取得をキャンセルしました。部分的な結果は表示しません。";tabs.Items.Clear();}
    catch(Exception ex){message.Text="集計できませんでした。部分的な結果は表示しません。";tabs.Items.Clear();MessageBox.Show(w,SafeError(ex),"サーバー集計の取得失敗");}
    finally {pending.Dispose();pending=null;loading=false;controls.IsEnabled=true;cancel.IsEnabled=false;progress.Visibility=Visibility.Collapsed;if(closeAfter)w.Close();}
@@ -60,3 +70,4 @@ public partial class Blocks {
   w.ShowDialog();
  }
 }
+

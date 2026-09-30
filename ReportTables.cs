@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -36,3 +36,4 @@ public static class ReportTables {
   cancellation.ThrowIfCancellationRequested();return new List<DataTable>{users,projects,projectUsers,projectActivities,details,activities,months,comments};
  }
 }
+
