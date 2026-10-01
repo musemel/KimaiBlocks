@@ -36,17 +36,26 @@ public partial class Blocks {
    w.BeginInlineComment(a);if(w.inlineComment==null)throw new Exception("Inline editor missing");w.inlineComment.Text="inline comment";w.FinishInline(true);if(a.Note!="inline comment")throw new Exception("Inline comment commit");
    w.SetZoom(200);if(Hour!=288||w.board.Height!=6912)throw new Exception("Zoom scale");w.SetZoom(100);
    w.state.FixedColors[ProjectColorKey(Projects[0])]="#102030";w.RefreshColors();if(w.ColorFor(Projects[0])!="#102030"||Enumerable.Range(0,100).Select(AutoColor).Distinct().Count()!=100)throw new Exception("Project colors");
-   w.Render();w.UpdateLayout();w.calendarScroll.ScrollToVerticalOffset(8*Hour);w.UpdateLayout();
+   w.SelectEntry(a,ModifierKeys.None);w.SetDayView(true);w.UpdateLayout();if(w.DisplayDayCount!=1||w.DisplayStart!=a.Start.Date||w.entryBoxes.Values.Any(box=>box.Effect!=null))throw new Exception("Day view / clear selected text");
+   await w.NavigateCalendar(1);if(w.DisplayStart!=w.week.AddDays(1)||w.entryBoxes.Count!=0)throw new Exception("Day navigation");w.SetDayView(false);if(w.DisplayDayCount!=5)throw new Exception("Week view");
+   w.rangeStart=w.week.AddDays(2).AddHours(10);w.rangeMinutes=90;w.DrawSelectedRange();if(w.rangeVisual==null||Math.Abs(w.rangeVisual.Height-1.5*Hour)>.01)throw new Exception("Selected time range");w.rangeStart=null;
+   var hiddenProject=w.service.Projects.First(p=>p.Id==a.ProjectId);hiddenProject.Visible=false;if(w.VisibleEntries().Any(e=>e.ProjectId==a.ProjectId))throw new Exception("Disabled project calendar");hiddenProject.Visible=true;
+   w.BeginInlineComment(a);w.inlineComment.Text="Enter confirms";w.inlineComment.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice,PresentationSource.FromVisual(w),0,Key.Enter) {RoutedEvent=Keyboard.PreviewKeyDownEvent});if(w.inlineComment!=null||a.Note!="Enter confirms")throw new Exception("F2 Enter confirmation");
+   void CaptureDialog(string title,string name,Action open){w.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle,new Action(()=>{var dialog=w.OwnedWindows.Cast<Window>().Single(x=>x.Title==title);dialog.UpdateLayout();var content=(FrameworkElement)dialog;var shot=new RenderTargetBitmap((int)content.ActualWidth,(int)content.ActualHeight,96,96,PixelFormats.Pbgra32);shot.Render(content);var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(shot));using(var file=File.Create(Path.Combine(AppContext.BaseDirectory,name)))encoder.Save(file);dialog.Close();}));open();}
+   CaptureDialog("プロジェクトの固定色","color-picker-preview.png",()=>w.ColorDialog(Projects[0]));
+   CaptureDialog("表示・作業ツリー","view-settings-preview.png",w.ViewSettingsDialog);
+   foreach(var activity in w.service.Activities)activity.Name="開発作業/仕様の確認と画面の表示調整を行う長いアクティビティ名";w.state.Hidden.Clear();w.Populate();w.Render();w.UpdateLayout();w.calendarScroll.ScrollToVerticalOffset(8*Hour);w.UpdateLayout();
    // Produce a reviewable screenshot of the real WPF layout without user/server data.
    var visual=(FrameworkElement)w.Content;var bitmap=new RenderTargetBitmap((int)visual.ActualWidth,(int)visual.ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(visual);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using(var stream=File.Create(Path.Combine(AppContext.BaseDirectory,"interaction-preview.png")))png.Save(stream);
    var report=new ReportSnapshot {Users=new List<ReportUser>{new ReportUser {Id=1},new ReportUser {Id=2}},Records=new List<ReportRecord>{new ReportRecord {UserId=1,Begin=w.week.AddHours(23),End=w.week.AddDays(1).AddHours(1)},new ReportRecord {UserId=2,Begin=w.week,End=w.week.AddHours(1)}}};
    var filtered=MemberReports.Filter(report,new HashSet<int>{1});if(filtered.Users.Count!=1||filtered.Records.Count!=1||MemberReports.Slices(filtered.Records,w.week.AddDays(1)).Single().End!=w.week.AddDays(1).AddHours(1)||MemberReports.Filter(report,new HashSet<int>()).Records.Count!=0)throw new Exception("Member filtering or day slices");
    w.ShowMemberCalendar(w,report,dialog=>{
     var root=(System.Windows.Controls.DockPanel)dialog.Content;var toolbar=(System.Windows.Controls.WrapPanel)root.Children[0];var mode=(System.Windows.Controls.ComboBox)toolbar.Children[0];mode.SelectedIndex=1;dialog.UpdateLayout();
-    var content=(FrameworkElement)dialog.Content;var shot=new RenderTargetBitmap((int)content.ActualWidth,(int)content.ActualHeight,96,96,PixelFormats.Pbgra32);shot.Render(content);var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(shot));using(var file=File.Create(Path.Combine(AppContext.BaseDirectory,"member-preview.png")))encoder.Save(file);dialog.Close();
+    var content=(FrameworkElement)dialog;var shot=new RenderTargetBitmap((int)content.ActualWidth,(int)content.ActualHeight,96,96,PixelFormats.Pbgra32);shot.Render(content);var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(shot));using(var file=File.Create(Path.Combine(AppContext.BaseDirectory,"member-preview.png")))encoder.Save(file);dialog.Close();
    });
    Console.WriteLine("PASS: selection, bulk/inline editing, undo/redo after save, schedule clipping, colors, zoom, member filters and cross-day slices.");
   }finally {w.closingApproved=true;w.Close();}
  }
 }
+
 

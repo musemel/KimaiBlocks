@@ -20,6 +20,7 @@ public partial class Blocks {
  List<Entry> VisibleEntries() {
   var result=new List<Entry>();
   foreach(var en in state.Entries) {
+   if(service!=null&&(service.Projects.Any(p=>p.Id==en.ProjectId&&p.Visible==false)||service.Activities.Any(a=>a.Id==en.ActivityId&&a.Visible==false)))continue;
    DateTime end=en.Start.AddMinutes(en.Minutes);
    if(end<=week||en.Start>=week.AddDays(7))continue;
    if(en.Start.Date==end.AddTicks(-1).Date){result.Add(en);continue;}

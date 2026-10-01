@@ -50,7 +50,13 @@ public sealed partial class KimaiService {
    if(records.Count==before)throw new KimaiFailure("ページ取得が進みません。部分的な結果は集計しません。");
    if(page==1000)throw new KimaiFailure("50万件の取得上限です。期間を短くしてください。部分的な結果は集計しません。");
   }
-  cancellation.ThrowIfCancellationRequested();result.Records=records.Values.ToList();
+  cancellation.ThrowIfCancellationRequested();
+  var disabledUsers=result.Users.Where(u=>u.Enabled==false).Select(u=>u.Id).ToHashSet();
+  var disabledProjects=Projects.Where(p=>p.Visible==false).Select(p=>p.Id.Value).ToHashSet();
+  var disabledActivities=Activities.Where(a=>a.Visible==false).Select(a=>a.Id.Value).ToHashSet();
+  result.Users.RemoveAll(u=>u.Enabled==false);
+  result.Records=records.Values.Where(r=>!disabledUsers.Contains(r.UserId)&&!disabledProjects.Contains(r.ProjectId)&&!disabledActivities.Contains(r.ActivityId)).ToList();
+  result.Notice+=" 無効なユーザー・プロジェクト・アクティビティは除外しています（APIで状態を確認できたもの）。";
   foreach(int id in result.Records.Select(r=>r.UserId).Distinct().Except(result.Users.Select(u=>u.Id)))result.Users.Add(new ReportUser {Id=id,Name="ユーザー [#"+id+"]"});
   result.Retrieved=DateTime.Now;return result;
  }

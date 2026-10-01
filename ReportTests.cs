@@ -16,7 +16,7 @@ public sealed class ReportMock : HttpMessageHandler {
   string path=request.RequestUri.AbsolutePath,query=Uri.UnescapeDataString(request.RequestUri.Query);Queries.Add(query);
   HttpResponseMessage Reply(string json,HttpStatusCode status=HttpStatusCode.OK)=>new HttpResponseMessage(status){Content=new StringContent(json,Encoding.UTF8,"application/json")};
   if(path.EndsWith("/users/me"))return Task.FromResult(Reply("{\"id\":7,\"username\":\"self\",\"timezone\":\"Asia/Tokyo\"}"));
-  if(path.EndsWith("/users"))return Task.FromResult(DenyUsers?Reply("{}",HttpStatusCode.Forbidden):Reply("[{\"id\":7,\"username\":\"self\",\"enabled\":true},{\"id\":8,\"username\":\"other\",\"enabled\":true},{\"id\":9,\"username\":\"zero\",\"enabled\":false}]"));
+  if(path.EndsWith("/users"))return Task.FromResult(DenyUsers?Reply("{}",HttpStatusCode.Forbidden):Reply("[{\"id\":7,\"username\":\"self\",\"enabled\":true},{\"id\":8,\"username\":\"other\",\"enabled\":true},{\"id\":9,\"username\":\"disabled\",\"enabled\":false},{\"id\":10,\"username\":\"zero\",\"enabled\":true}]"));
   if(!path.EndsWith("/timesheets")||!query.Contains("user=all")||!query.Contains("size=500")||!query.Contains("orderBy=id"))throw new Exception("Invalid report query");
   bool second=query.Contains("page=2");if(DenyTimesheets)return Task.FromResult(Reply("{}",HttpStatusCode.Forbidden));if(second&&FailSecond)return Task.FromResult(Reply("{}",HttpStatusCode.InternalServerError));
   string first="[{\"id\":1,\"user\":7,\"project\":11,\"activity\":21,\"begin\":\"2026-09-21T00:00:00+00:00\",\"end\":\"2026-09-21T01:00:00+00:00\",\"duration\":1800,\"break\":1800,\"description\":\"A\"}]";
@@ -31,12 +31,14 @@ public static class ReportTests {
   var data=await api.ReadReportAsync(new DateTime(2026,9,21),new DateTime(2026,9,22),null,CancellationToken.None);
   Check(data.Records.Count==3&&data.Records[0].Begin.Hour==9&&data.Records[0].Seconds==1800,"Report timezone/duration/pagination");
   Check(mock.Queries.Last().Contains("begin=2026-09-21T00:00:00")&&mock.Queries.Last().Contains("end=2026-09-22T23:59:59"),"Report inclusive range");
-  var tables=ReportTables.Build(data);var users=tables[0];
+  var tables=ReportTables.Build(data);var users=tables[0];Check(!users.Columns.Contains("有効状態"),"Redundant enabled column");
   var filterTable=new DataTable();filterTable.Columns.Add("text",typeof(string));filterTable.Rows.Add("a['%*]b");filterTable.Rows.Add("other");filterTable.DefaultView.RowFilter=ReportTables.FilterExpression(filterTable,"['%*]");Check(filterTable.DefaultView.Count==1,"Table search did not escape literal characters");
   Check(users.Rows.Count==3&&(int)users.Rows[2]["実績件数"]==0&&users.Rows[2]["取得状態"].ToString().Contains("断定不可"),"Zero-user reporting");
   Check(tables.Single(t=>t.TableName=="プロジェクト合計").Rows.Cast<DataRow>().Sum(r=>(decimal)r["完了時間(h)"])==0.5m,"Report used wall duration or running duration");
   Check(tables.Single(t=>t.TableName=="実績明細").Rows.Cast<DataRow>().Count(r=>r.IsNull("時間(h)"))==2,"Unknown duration presented as zero");
   await api.ReadReportAsync(null,null,null,CancellationToken.None);Check(!mock.Queries.Last().Contains("begin=")&&!mock.Queries.Last().Contains("end="),"All-time query limited");
+  Check(data.Users.All(u=>u.Id!=9),"Disabled user remained visible");
+  api.Projects.Add(new MarkZither.KimaiDotNet.Models.ProjectCollection {Id=11,Visible=false});var filtered=await api.ReadReportAsync(null,null,null,CancellationToken.None);Check(filtered.Records.Count==1&&filtered.Records[0].ProjectId==12,"Disabled project included in reports");api.Projects.Clear();
   mock.DenyUsers=true;data=await api.ReadReportAsync(null,null,null,CancellationToken.None);Check(data.Users.Count==2&&data.Notice.Contains("権限がない"),"Roster permission fallback");
   mock.FailSecond=true;try{await api.ReadReportAsync(null,null,null,CancellationToken.None);throw new Exception("Partial result accepted");}catch(KimaiFailure){}mock.FailSecond=false;
   mock.DenyTimesheets=true;try{await api.ReadReportAsync(null,null,null,CancellationToken.None);throw new Exception("Forbidden report accepted");}catch(KimaiFailure){}mock.DenyTimesheets=false;
@@ -45,4 +47,5 @@ public static class ReportTests {
   Console.WriteLine("PASS: report permissions, paging, all-time/range queries, server durations, zero users, missing durations, partial failure and cancellation.");
  }
 }
+
 

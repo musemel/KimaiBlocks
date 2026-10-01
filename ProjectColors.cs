@@ -23,15 +23,16 @@ public partial class Blocks {
   return $"#{(int)Math.Round((r+m)*255):X2}{(int)Math.Round((g+m)*255):X2}{(int)Math.Round((b+m)*255):X2}";
  }
  string ColorFor(string project) {if(project==null)return "#DDE6EF";if(state.FixedColors.TryGetValue(ProjectColorKey(project),out var fixedColor))return fixedColor;if(!projectColors.TryGetValue(project,out var color)){int index=projectColors.Count;do{color=AutoColor(index++);}while(projectColors.Values.Contains(color)||state.FixedColors.Values.Contains(color));projectColors[project]=color;}return color;}
- void ColorDialog() {
-  var w=new Window {Title="プロジェクトの固定色",Owner=this,Width=540,Height=590,WindowStartupLocation=WindowStartupLocation.CenterOwner};var root=new DockPanel {Margin=new Thickness(16)};w.Content=root;
+ void ColorDialog(string selectedProject=null) {
+  var w=new Window {Title="プロジェクトの固定色",Owner=this,Width=540,Height=570,WindowStartupLocation=WindowStartupLocation.CenterOwner};var root=new DockPanel {Margin=new Thickness(16)};w.Content=root;
   var filter=new TextBox {Margin=new Thickness(4),Padding=new Thickness(5)};DockPanel.SetDock(filter,Dock.Top);root.Children.Add(filter);
   var bottom=new StackPanel();DockPanel.SetDock(bottom,Dock.Bottom);root.Children.Add(bottom);
   bottom.Children.Add(Label("固定色（#RRGGBB）。自動に戻すと表示対象の色を再割当します。",12));var hex=new TextBox {Text="#B9DCF9",Padding=new Thickness(6)};bottom.Children.Add(hex);
   var preview=new Border {Height=25,Margin=new Thickness(4),Background=BrushOf(hex.Text)};bottom.Children.Add(preview);hex.TextChanged+=(s,e)=>{try{preview.Background=BrushOf(hex.Text);}catch{}};
-  var list=new ListBox {Margin=new Thickness(4)};root.Children.Add(list);
+  bottom.Children.Add(ButtonOf("色を選択…（Windows標準）",()=>{try{var selected=PickWindowsColor(w,hex.Text);if(selected!=null)hex.Text=selected;}catch(Exception ex){MessageBox.Show(w,ex.Message,"色を選択できません");}}));  var list=new ListBox {Margin=new Thickness(4)};root.Children.Add(list);
   void Fill()=>list.ItemsSource=Projects.Where(p=>Matches(p,filter.Text)).ToArray();filter.TextChanged+=(s,e)=>Fill();Fill();
   list.SelectionChanged+=(s,e)=>{if(list.SelectedItem is string p)hex.Text=ColorFor(p);};
+  if(selectedProject!=null)list.SelectedItem=selectedProject;
   void Apply(bool fixedValue) {if(list.SelectedItem is not string project)return;string value=hex.Text.Trim();if(fixedValue&&(!System.Text.RegularExpressions.Regex.IsMatch(value,"^#[0-9a-fA-F]{6}$"))){MessageBox.Show(w,"#RRGGBB形式で入力してください。");return;}if(fixedValue)state.FixedColors[ProjectColorKey(project)]=value.ToUpperInvariant();else state.FixedColors.Remove(ProjectColorKey(project));colorSignature="";Save();RefreshColors();Populate();Render();}
   bottom.Children.Add(ButtonOf("指定色で固定",()=>Apply(true)));bottom.Children.Add(ButtonOf("自動割当へ戻す",()=>Apply(false)));bottom.Children.Add(ButtonOf("閉じる",()=>w.Close()));w.ShowDialog();
  }

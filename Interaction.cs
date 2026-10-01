@@ -13,12 +13,12 @@ public partial class Blocks {
  readonly Stack<List<Entry>> undo=new Stack<List<Entry>>(),redo=new Stack<List<Entry>>();
  List<Entry> clipboardEntries=new List<Entry>();DateTime? pasteTime;
  void Remember(){if(undo.Count>=100){var keep=undo.Take(99).Reverse().ToList();undo.Clear();foreach(var item in keep)undo.Push(item);}undo.Push(EditingModel.Snapshot(state.Entries));redo.Clear();}
- void ClearHistory(){undo.Clear();redo.Clear();selectionAnchor=null;pasteTime=null;selectedKeys.Clear();selected=null;editorDirty=false;editorEntry=null;}
+ void ClearHistory(){undo.Clear();redo.Clear();selectionAnchor=null;pasteTime=null;rangeStart=null;selectedKeys.Clear();selected=null;editorDirty=false;editorEntry=null;}
  bool IsSelected(Entry en)=>selectedKeys.Contains(EditingModel.Key(en));
  void RefreshSelection() {
   if(selected!=null)selected=state.Entries.FirstOrDefault(e=>EditingModel.Key(e)==EditingModel.Key(selected));
   selectedKeys.IntersectWith(state.Entries.Select(EditingModel.Key));
-  foreach(var pair in entryBoxes){pair.Value.BorderBrush=IsSelected(pair.Key)?BrushOf("#064FA3"):Brushes.White;pair.Value.BorderThickness=new Thickness(1);pair.Value.Effect=IsSelected(pair.Key)?new System.Windows.Media.Effects.DropShadowEffect {Color=Color.FromRgb(0,90,210),BlurRadius=4,ShadowDepth=0,Opacity=1}:null;}
+  foreach(var pair in entryBoxes){pair.Value.BorderBrush=IsSelected(pair.Key)?BrushOf("#064FA3"):Brushes.White;pair.Value.BorderThickness=new Thickness(IsSelected(pair.Key)?2:1);pair.Value.Effect=null;}
   RenderEditor();UpdateEditToolbar();
  }
  bool SelectEntry(Entry en,ModifierKeys modifiers) {
@@ -49,7 +49,7 @@ public partial class Blocks {
    if(typing)return;
    if(ctrl&&e.Key==Key.Z){e.Handled=true;UndoEdit(shift);}
    else if(ctrl&&e.Key==Key.Y){e.Handled=true;UndoEdit(true);}
-   else if(ctrl&&e.Key==Key.A){e.Handled=true;if(!ApplyEditor())return;selectedKeys.Clear();foreach(var row in VisibleEntries().Where(r=>(r.Start.Date-week).Days<DisplayDayCount))selectedKeys.Add(EditingModel.Key(row));selected=SelectedEntries().FirstOrDefault();RefreshSelection();}
+   else if(ctrl&&e.Key==Key.A){e.Handled=true;if(!ApplyEditor())return;selectedKeys.Clear();foreach(var row in VisibleEntries().Where(r=>r.Start.Date>=DisplayStart&&(r.Start.Date-DisplayStart).Days<DisplayDayCount))selectedKeys.Add(EditingModel.Key(row));selected=SelectedEntries().FirstOrDefault();RefreshSelection();}
    else if(ctrl&&e.Key==Key.C){e.Handled=true;CopySelection();}
    else if(ctrl&&e.Key==Key.V){e.Handled=true;await PasteSelection();}
    else if(e.Key==Key.Delete){e.Handled=true;await DeleteSelection();}
@@ -76,7 +76,7 @@ public partial class Blocks {
   if(!CanEdit()||originals.Any(e=>!copy&&!CanEdit(e)))return;
   var exclude=originals.Select(EditingModel.Key).ToHashSet();var occupied=state.Entries.Where(e=>copy||!exclude.Contains(EditingModel.Key(e))).ToList();var planned=new List<List<Entry>>();
   foreach(var candidate in desired) {
-   if(candidate.Start<week||candidate.Start.AddMinutes(candidate.Minutes)>week.AddDays(DisplayDayCount)||candidate.Start.Date!=candidate.Start.AddMinutes(candidate.Minutes).AddTicks(-1).Date){status.Text="表示範囲内・同日内に収めてください。";Render();return;}
+   if(candidate.Start<DisplayStart||candidate.Start.AddMinutes(candidate.Minutes)>DisplayStart.AddDays(DisplayDayCount)||candidate.Start.Date!=candidate.Start.AddMinutes(candidate.Minutes).AddTicks(-1).Date){status.Text="表示範囲内・同日内に収めてください。";Render();return;}
    var parts=EditingModel.Plan(candidate,occupied,Rules);if(parts.Count==0){status.Text="入力可能な空き時間がありません。変更しませんでした。";Render();return;}planned.Add(parts);occupied.AddRange(parts);
   }
   Remember();selectedKeys.Clear();
@@ -87,4 +87,6 @@ public partial class Blocks {
   selected=SelectedEntries().FirstOrDefault();if(selected!=null)statisticsDay=selected.Start.Date;Save();Render();status.Text="選択実績を"+(copy?"コピー":"変更")+"しました · 重複・入力禁止時間を除外 · 保存待ち";await Task.CompletedTask;
  }
 }
+
+
 

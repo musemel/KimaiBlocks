@@ -1,0 +1,9 @@
+{
+  "SaveSeconds": 120,
+  "ActivityGroupingPattern": "(.*)/(.*)",
+  "ShowWeekends": false,
+  "Calendar": {
+    "OffHours": "00:00-09:00\n18:00-24:00",
+    "BlockInput": true
+  }
+}

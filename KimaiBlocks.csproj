@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Version>2026.10.1.213</Version>
+    <Version>2026.10.2.239</Version>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
@@ -16,6 +16,10 @@
     <PackageReference Include="MarkZither.KimaiDotNet.ApiClient" Version="1.0.0" />
   </ItemGroup>
 </Project>
+
+
+
+
 
 
 

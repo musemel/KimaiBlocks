@@ -63,7 +63,7 @@ public partial class Blocks {
   if(!Rules.Shade)return;
   var intervals=Rules.Intervals();var holidays=Rules.HolidayDates();
   for(int d=0;d<DisplayDayCount;d++) {
-   DateTime date=week.AddDays(d);
+   DateTime date=DisplayStart.AddDays(d);
    bool off=(Rules.DaysOff??Array.Empty<int>()).Contains((int)date.DayOfWeek)||holidays.Contains(date);
    foreach(var range in off?new List<(int Start,int End)>{(0,1440)}:intervals) {
     var shade=new Border {Width=DayWidth,Height=(range.End-range.Start)/60.0*Hour,Background=BrushOf(off?"#D2D9E2":"#DFE4EB"),IsHitTestVisible=false};
@@ -98,4 +98,5 @@ public partial class Blocks {
   }));w.ShowDialog();
  }
 }
+
 

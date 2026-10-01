@@ -17,11 +17,16 @@ public class ProjectChoice {
  readonly Action<bool> write;
  public ProjectChoice(string name, Func<bool> read, Action<bool> write) {Name=name;this.read=read;this.write=write;}
 }
+public sealed class TreeRowWidth : IValueConverter {
+ public object Convert(object value,Type target,object parameter,System.Globalization.CultureInfo culture)=>Math.Max(80,(value is double width?width:260)-System.Convert.ToDouble(parameter,culture));
+ public object ConvertBack(object value,Type target,object parameter,System.Globalization.CultureInfo culture)=>Binding.DoNothing;
+}
 public partial class Blocks {
  TextBox projectSearch = new TextBox();
  ListBox projectList = new ListBox();
  TreeView tree = new TreeView();
  bool rebuildingTree;
+ ActivityGrouping activityGrouping=new ActivityGrouping(ActivityGrouping.DefaultPattern);
  void BuildSidebar(DockPanel root) {
   var left=new DockPanel {Width=280,Margin=new Thickness(12,0,12,0),Background=Brushes.White};
   DockPanel.SetDock(left,Dock.Left);root.Children.Add(left);AddPanelResizer(root,left,Dock.Left);
@@ -34,7 +39,7 @@ public partial class Blocks {
   var hint=Label("右クリックでフォルダ追加・削除\nプロジェクトをフォルダへドラッグ",11);hint.Foreground=BrushOf("#63758A");filters.Children.Add(hint);
   VirtualizingPanel.SetIsVirtualizing(tree,true);VirtualizingPanel.SetVirtualizationMode(tree,VirtualizationMode.Recycling);ScrollViewer.SetCanContentScroll(tree,true);
   tree.BorderThickness=new Thickness(0);tree.Margin=new Thickness(4);tree.Background=Brushes.White;
-  tree.ContextMenu=FolderMenu(null);left.Children.Add(tree);
+  left.Children.Add(tree);
  }
  void ShowProjectChoices() {
   var w=new Window {Title="表示プロジェクト",Owner=this,Width=540,Height=660,WindowStartupLocation=WindowStartupLocation.CenterOwner};
@@ -64,6 +69,7 @@ public partial class Blocks {
  static bool Matches(string value,string query) {string Clean(string s)=>new string((s??" ").Normalize(NormalizationForm.FormKC).Where(c=>!char.IsWhiteSpace(c)).ToArray());return System.Globalization.CultureInfo.GetCultureInfo("ja-JP").CompareInfo.IndexOf(Clean(value),Clean(query),System.Globalization.CompareOptions.IgnoreCase|System.Globalization.CompareOptions.IgnoreKanaType|System.Globalization.CompareOptions.IgnoreWidth)>=0;}
  string FolderOf(string project) {string f;return state.ProjectFolders.TryGetValue(project,out f)&&state.Folders.Contains(f)?f:null;}
  void Populate() {
+  try {activityGrouping=new ActivityGrouping(settings.ActivityGroupingPattern);}catch(ArgumentException){activityGrouping=new ActivityGrouping("");status.Text="アクティビティの正規表現が不正です。設定を確認してください。";}
   RefreshColors();rebuildingTree=true;
   try {
    tree.Items.Clear();
@@ -82,6 +88,7 @@ public partial class Blocks {
   node.Expanded+=(s,e)=>{if(e.OriginalSource!=node)return;if(!rebuildingTree&&string.IsNullOrWhiteSpace(search.Text)&&favorites.IsChecked!=true){state.Collapsed.Remove(key);Save();}};
   node.Collapsed+=(s,e)=>{if(e.OriginalSource!=node)return;if(!rebuildingTree&&string.IsNullOrWhiteSpace(search.Text)&&favorites.IsChecked!=true){if(!state.Collapsed.Contains(key))state.Collapsed.Add(key);Save();}};
   header.MouseRightButtonDown+=(s,e)=>node.IsSelected=true;
+  node.ContextMenuOpening+=(s,e)=>{if(node.ContextMenu!=null)return;var source=e.OriginalSource as DependencyObject;while(source!=null&&source is not TreeViewItem)source=source is Visual?VisualTreeHelper.GetParent(source):LogicalTreeHelper.GetParent(source);if(ReferenceEquals(source,node))e.Handled=true;};
   return node;
  }
  void AddProject(TreeViewItem parent,string project,string folder) {
@@ -90,23 +97,28 @@ public partial class Blocks {
   var projectParts=EditingModel.Path(project);var projectParent=PathParent(parent,projectParts.Take(Math.Max(0,projectParts.Length-1)),"project-path:"+folder);
   var node=Node("■  "+(projectParts.LastOrDefault()??project),"project:"+project,false);var header=(TextBlock)node.Header;
   header.Foreground=ReadableText(ColorFor(project));header.Background=BrushOf(ColorFor(project));header.ToolTip=project;
-  DragSource(header,"project",project,DragDropEffects.Move);node.ContextMenu=FolderMenu(null);projectParent.Items.Add(node);
+  DragSource(header,"project",project,DragDropEffects.Move|DragDropEffects.Copy);node.ContextMenu=new ContextMenu();var colorItem=new MenuItem {Header="このプロジェクトの色…"};colorItem.Click+=(s,e)=>ChooseProjectColor(project);node.ContextMenu.Items.Insert(0,colorItem);var autoColorItem=new MenuItem {Header="色を自動割当に戻す"};autoColorItem.Click+=(s,e)=>SetProjectColor(project,null);node.ContextMenu.Items.Add(autoColorItem);projectParent.Items.Add(node);
   bool filled=false;
   Action fill=()=>{if(filled)return;filled=true;node.Items.Clear();
   foreach(var activity in activities) {
    string key=project+"|"+activity;
-   var row=new StackPanel {Orientation=Orientation.Horizontal};
-   var activityParts=EditingModel.Path(activity);var activityParent=PathParent(node,activityParts.Take(Math.Max(0,activityParts.Length-1)),"activity-path:"+project);
-   var name=Label(activityParts.LastOrDefault()??activity,12);name.MinWidth=90;name.Cursor=Cursors.Hand;name.ToolTip=activity+"\nカレンダーへドラッグして実績を作成。既存ブロックへドロップすると作業を置換";row.Children.Add(name);
+   var row=new Grid {MinHeight=24};row.ColumnDefinitions.Add(new ColumnDefinition());row.ColumnDefinitions.Add(new ColumnDefinition {Width=GridLength.Auto});
+   var grouping=activityGrouping.Split(activity);var activityParent=grouping.Group==null?node:PathParent(node,new[]{grouping.Group},"activity-regex:"+project);
+   if(grouping.Group!=null&&((FrameworkElement)activityParent.Header).Tag==null){((FrameworkElement)activityParent.Header).Tag=true;DragSource((FrameworkElement)activityParent.Header,"work-group",System.Text.Json.JsonSerializer.Serialize(new[]{project,grouping.Group}),DragDropEffects.Copy);}
+   int depth=1;for(var ancestor=activityParent;ancestor!=null;ancestor=ancestor.Parent as TreeViewItem)depth++;
+   var card=new Border {Child=row,Background=BrushOf("#F3F6FA"),BorderBrush=BrushOf("#CCD9E6"),BorderThickness=new Thickness(2,0,0,0),CornerRadius=new CornerRadius(3),Padding=new Thickness(4,0,2,0),Margin=new Thickness(0,1,0,1)};
+   card.SetBinding(FrameworkElement.WidthProperty,new Binding("ActualWidth") {Source=tree,Converter=new TreeRowWidth(),ConverterParameter=depth*19+20});
+   card.MouseEnter+=(s,e)=>card.Background=BrushOf("#E2EEFB");card.MouseLeave+=(s,e)=>card.Background=BrushOf("#F3F6FA");
+   var name=Label(grouping.Name,13);name.TextWrapping=TextWrapping.NoWrap;name.TextTrimming=TextTrimming.CharacterEllipsis;name.Foreground=BrushOf("#20354B");name.Margin=new Thickness(4,2,5,2);name.Cursor=Cursors.Hand;name.ToolTip=activity+"\nカレンダーへドラッグして実績を作成。既存ブロックへドロップすると作業を置換";row.Children.Add(name);
    DragSource(name,"work",System.Text.Json.JsonSerializer.Serialize(new[]{project,activity}),DragDropEffects.Copy);
    var star=ButtonOf(state.Favorites.Contains(key)?"★":"☆",()=>{if(state.Favorites.Contains(key))state.Favorites.Remove(key);else state.Favorites.Add(key);Save();Populate();});
-   star.Padding=new Thickness(5,0,5,0);star.Margin=new Thickness(2,0,2,0);star.ToolTip="お気に入りを切り替え";row.Children.Add(star);
-   activityParent.Items.Add(new TreeViewItem {Header=row,ContextMenu=FolderMenu(null)});
+   star.Padding=new Thickness(3);star.Margin=new Thickness(0);star.Width=26;star.Height=22;star.FontSize=15;star.VerticalAlignment=VerticalAlignment.Center;star.Background=Brushes.Transparent;star.BorderThickness=new Thickness(0);star.Foreground=state.Favorites.Contains(key)?BrushOf("#936000"):BrushOf("#687C90");star.ToolTip="お気に入りを切り替え";Grid.SetColumn(star,1);row.Children.Add(star);
+   var leaf=new TreeViewItem {Header=card};leaf.ContextMenuOpening+=(s,e)=>e.Handled=true;activityParent.Items.Add(leaf);
   }};
   if(node.IsExpanded)fill();else {node.Items.Add(new TreeViewItem());node.Expanded+=(s,e)=>{if(e.OriginalSource==node)fill();};}
  }
  TreeViewItem PathParent(TreeViewItem parent,IEnumerable<string> parts,string prefix) {
-  string path=prefix;foreach(var part in parts){path+="/"+part;var child=parent.Items.OfType<TreeViewItem>().FirstOrDefault(n=>n.Tag as string==path);if(child==null){child=Node(part,path,false);child.Tag=path;parent.Items.Add(child);}parent=child;}return parent;
+  string path=prefix;foreach(var part in parts){path+="/"+part;var child=parent.Items.OfType<TreeViewItem>().FirstOrDefault(n=>n.Tag as string==path);if(child==null){child=Node(part,path,false);child.Tag=path;if(prefix.StartsWith("activity-regex:")){var label=(TextBlock)child.Header;label.FontWeight=FontWeights.SemiBold;label.Foreground=BrushOf("#38546F");label.Margin=new Thickness(4,8,4,3);}parent.Items.Add(child);}parent=child;}return parent;
  }
  void DragSource(FrameworkElement element,string format,string value,DragDropEffects effects) {
   Point start=new Point();bool pressed=false;
@@ -118,7 +130,7 @@ public partial class Blocks {
    var delta=e.GetPosition(this)-start;
    if(Math.Abs(delta.X)<SystemParameters.MinimumHorizontalDragDistance&&Math.Abs(delta.Y)<SystemParameters.MinimumVerticalDragDistance)return;
    pressed=false;element.ReleaseMouseCapture();
-   status.Text=format=="work"?"カレンダーにドロップして実績を作成":"フォルダにドロップしてプロジェクトを移動";
+   status.Text=format=="project"?"フォルダへ移動、またはカレンダーでアクティビティを選んで配置":"カレンダーにドロップして実績を作成";
    DragDrop.DoDragDrop(element,new DataObject(format,value),effects);
   };
  }
@@ -138,6 +150,7 @@ public partial class Blocks {
   var button=ButtonOf("追加",()=>{string name=input.Text.Trim();if(name.Length==0||state.Folders.Any(f=>string.Equals(f,name,StringComparison.CurrentCultureIgnoreCase))){MessageBox.Show(w,"空でない、重複しない名前を入力してください。");return;}state.Folders.Add(name);Save();Populate();w.Close();});button.IsDefault=true;panel.Children.Add(button);w.Loaded+=(s,e)=>input.Focus();w.ShowDialog();
  }
  static void SidebarTests() {
+  ActivityGrouping.Tests();SettingsOverride.Tests();
   var serializer=new DataContractJsonSerializer(typeof(State));
   using(var old=new MemoryStream(Encoding.UTF8.GetBytes("{\"Entries\":[],\"Hidden\":[],\"Favorites\":[]}"))) {
    var migrated=(State)serializer.ReadObject(old);if(migrated.Folders==null||migrated.ProjectFolders==null||migrated.Collapsed==null)throw new Exception("Old state migration failed");
@@ -149,5 +162,11 @@ public partial class Blocks {
   if(!Matches("Project A","project")||Matches("Project A","other"))throw new Exception("Search failed");
  }
 }
+
+
+
+
+
+
 
 

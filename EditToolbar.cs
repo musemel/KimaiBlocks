@@ -27,13 +27,14 @@ public partial class Blocks {
   copyButton=Icon("コピー","Ctrl+C","M 7,7 L 20,7 L 20,20 L 7,20 Z M 3,15 L 1,15 L 1,1 L 15,1 L 15,3",CopySelection);
   pasteButton=Icon("貼り付け","Ctrl+V","M 6,4 L 2,4 L 2,21 L 19,21 L 19,4 L 15,4 M 6,2 L 15,2 L 15,7 L 6,7 Z M 6,12 L 15,12 M 6,16 L 15,16",async()=>await PasteSelection());
   deleteButton=Icon("削除","Delete","M 2,5 L 20,5 M 7,5 L 7,1 L 15,1 L 15,5 M 4,5 L 5,21 L 17,21 L 18,5 M 9,9 L 9,17 M 13,9 L 13,17",async()=>await DeleteSelection());
+  AddViewTools(bar);
   CommandManager.RequerySuggested+=ToolbarRequery;
   Closed+=(s,e)=>CommandManager.RequerySuggested-=ToolbarRequery;
   UpdateEditToolbar();
  }
  void ToolbarRequery(object sender,EventArgs e)=>UpdateEditToolbar();
  void UpdateEditToolbar() {
-  if(undoButton==null)return;
+  UpdateViewTools();if(undoButton==null)return;
   bool ready=!communicating&&!dragActive&&(demoMode||service!=null&&!needsRefresh&&!state.Pending.Any(p=>p.Attempted));
   var rows=SelectedEntries();bool writable=ready&&rows.All(e=>string.IsNullOrEmpty(e.ReadOnlyReason));
   undoButton.IsEnabled=ready&&(undo.Count>0||editorDirty);redoButton.IsEnabled=ready&&redo.Count>0&&!editorDirty;
@@ -46,8 +47,9 @@ public partial class Blocks {
  }
  async Task PasteSelection() {
   if(!CanEdit()||!ApplyEditor()||clipboardEntries.Count==0)return;
-  var start=clipboardEntries.Min(r=>r.Start);var target=pasteTime??(selected!=null?selected.Start.AddMinutes(selected.Minutes):week.AddHours(9));
+  var start=clipboardEntries.Min(r=>r.Start);var target=pasteTime??(selected!=null?selected.Start.AddMinutes(selected.Minutes):DisplayStart.AddHours(9));
   await ApplyBatchDrag(clipboardEntries,clipboardEntries.Select(r=>{var copy=r.Copy();copy.Start=target+(r.Start-start);return copy;}).ToList(),true);
  }
 }
+
 

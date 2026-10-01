@@ -1,4 +1,5 @@
-﻿{
+{
+  "ActivityGroupingPattern": "(.*)/(.*)",
   "Url": "",
   "SaveSeconds": 60,
   "CatalogMinutes": 60,

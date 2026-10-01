@@ -130,6 +130,7 @@ public sealed partial class KimaiService : IDisposable {
  public string ActivityName(int id) {return (Activities.FirstOrDefault(a=>a.Id==id)?.Name??"アクティビティ")+" [#"+id+"]";}
  public IEnumerable<ActivityCollection> ForProject(int id) {
   var p=Projects.FirstOrDefault(x=>x.Id==id);
+  if(p==null||p.Visible==false)return Array.Empty<ActivityCollection>();
   return Activities.Where(a=>a.Visible!=false && (a.Project==id || ((!a.Project.HasValue||a.Project==0)&&p?.GlobalActivities==true)));
  }
  public async Task<List<Entry>> ReadWeekAsync(DateTime week) {

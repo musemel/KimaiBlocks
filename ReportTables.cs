@@ -15,9 +15,9 @@ public static class ReportTables {
  public static List<DataTable> Build(ReportSnapshot data,CancellationToken cancellation=default) {
   cancellation.ThrowIfCancellationRequested();
   var names=data.Users.ToDictionary(u=>u.Id,u=>u.Name);string User(int id)=>names.TryGetValue(id,out var name)?name:"ユーザー [#"+id+"]";
-  var users=Table("ユーザー入力状況",("ユーザー",typeof(string)),("有効状態",typeof(string)),("取得状態",typeof(string)),("実績件数",typeof(int)),("入力日数",typeof(int)),("完了時間(h)",typeof(decimal)),("計測中",typeof(int)),("時間不明",typeof(int)),("最初の開始",typeof(DateTime)),("最後の開始",typeof(DateTime)));
+  var users=Table("ユーザー入力状況",("ユーザー",typeof(string)),("取得状態",typeof(string)),("実績件数",typeof(int)),("入力日数",typeof(int)),("完了時間(h)",typeof(decimal)),("計測中",typeof(int)),("時間不明",typeof(int)),("最初の開始",typeof(DateTime)),("最後の開始",typeof(DateTime)));
   var byUser=data.Records.ToLookup(r=>r.UserId);
-  foreach(var u in data.Users.OrderBy(u=>u.Name)){var rows=byUser[u.Id].ToList();users.Rows.Add(u.Name,u.Enabled.HasValue?(u.Enabled.Value?"有効":"無効"):"不明",rows.Count==0?"取得0件（未入力とは断定不可）":"実績あり",rows.Count,rows.Select(r=>r.Begin.Date).Distinct().Count(),Hours(rows),rows.Count(r=>r.Running),rows.Count(r=>!r.Running&&!r.Seconds.HasValue),Date(rows.Count==0?null:rows.Min(r=>r.Begin)),Date(rows.Count==0?null:rows.Max(r=>r.Begin)));}
+  foreach(var u in data.Users.OrderBy(u=>u.Name)){var rows=byUser[u.Id].ToList();users.Rows.Add(u.Name,rows.Count==0?"取得0件（未入力とは断定不可）":"実績あり",rows.Count,rows.Select(r=>r.Begin.Date).Distinct().Count(),Hours(rows),rows.Count(r=>r.Running),rows.Count(r=>!r.Running&&!r.Seconds.HasValue),Date(rows.Count==0?null:rows.Min(r=>r.Begin)),Date(rows.Count==0?null:rows.Max(r=>r.Begin)));}
   DataTable Summary(string title,IEnumerable<IGrouping<string,ReportRecord>> groups,string label) {
    var t=Table(title,(label,typeof(string)),("実績件数",typeof(int)),("ユーザー数",typeof(int)),("完了時間(h)",typeof(decimal)),("計測中",typeof(int)),("時間不明",typeof(int)));
    foreach(var g in groups.OrderByDescending(g=>Hours(g)))t.Rows.Add(g.Key,g.Count(),g.Select(r=>r.UserId).Distinct().Count(),Hours(g),g.Count(r=>r.Running),g.Count(r=>!r.Running&&!r.Seconds.HasValue));return t;

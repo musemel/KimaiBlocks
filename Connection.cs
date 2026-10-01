@@ -20,6 +20,8 @@ using System.Windows.Threading;
  [DataMember] public bool Attempted;
 }
 public sealed class ConnectionSettings {
+ public string StagedOverrideVersion {get;set;}="";
+ public string ActivityGroupingPattern {get;set;}=ActivityGrouping.DefaultPattern;
  public List<AccountProfile> Accounts {get;set;}=new List<AccountProfile>();
  public string ActiveAccountId {get;set;}="";
  public string Url {get;set;}="";
@@ -56,17 +58,29 @@ public partial class Blocks {
   var buttons=new StackPanel {Orientation=Orientation.Horizontal,Margin=new Thickness(8)};
   var menu=new Menu {Background=Brushes.Transparent,VerticalAlignment=VerticalAlignment.Center};
   var item=new MenuItem {Header="メニュー",Foreground=Brushes.White};
-  var create=new MenuItem {Header="プロジェクト追加…",Foreground=Brushes.Black};create.Click+=async(s,e)=>await ProjectDialog();item.Items.Add(create);
-  var calendar=new MenuItem {Header="休日・休み時間・時間外…",Foreground=Brushes.Black};calendar.Click+=(s,e)=>CalendarDialog();item.Items.Add(calendar);menu.Items.Add(item);buttons.Children.Add(menu);
-  var colors=new MenuItem {Header="プロジェクトの固定色…",Foreground=Brushes.Black};colors.Click+=(s,e)=>ColorDialog();item.Items.Add(colors);
-  var zoomMenu=new MenuItem {Header="表示倍率",Foreground=Brushes.Black};foreach(int percent in new[]{50,75,100,125,150,175,200,250,300,400}){int value=percent;var choice=new MenuItem {Header=percent+"%"};choice.Click+=(s,e)=>SetZoom(value);zoomMenu.Items.Add(choice);}item.Items.Add(zoomMenu);
-  var config=new MenuItem {Header="設定…",Foreground=Brushes.Black};config.Click+=(s,e)=>ConnectionDialog();item.Items.Add(config);
-  var reset=new MenuItem {Header="バックアップを破棄してサーバーから再取得…",Foreground=Brushes.Black};reset.Click+=async(s,e)=>await ResetFromServer();item.Items.Add(reset);
-  var update=new MenuItem {Header="アップデートを確認",Foreground=Brushes.Black};update.Click+=async(s,e)=>await CheckUpdates(true);item.Items.Add(update);
-  var serverStats=new MenuItem {Header="サーバー実績集計（全ユーザー）…",Foreground=Brushes.Black};serverStats.Click+=(s,e)=>ShowServerReports();item.Items.Add(serverStats);
-  var detailStats=new MenuItem {Header="コメント別の詳細集計…",Foreground=Brushes.Black};detailStats.Click+=(s,e)=>ShowDetailedStatistics();item.Items.Add(detailStats);
-  var stats=new MenuItem {Header="右の統計パネルを表示／非表示",Foreground=Brushes.Black};stats.Click+=(s,e)=>SetStatisticsVisible(!settings.ShowStatistics);item.Items.Add(stats);
-  buttons.Children.Add(ButtonOf("再読込",async()=>await RefreshRemote()));
+  MenuItem Group(string title){var group=new MenuItem {Header=title,Foreground=Brushes.Black};item.Items.Add(group);return group;}
+  void ActionItem(MenuItem parent,string title,Action action){var entry=new MenuItem {Header=title};entry.Click+=(s,e)=>action();parent.Items.Add(entry);}
+  var connectionMenu=Group("接続・データ");
+  ActionItem(connectionMenu,"アカウント・接続設定…",ConnectionDialog);
+  ActionItem(connectionMenu,"再読込",async()=>await RefreshRemote());
+  ActionItem(connectionMenu,"今すぐ保存",async()=>await FlushAsync(true));
+  ActionItem(connectionMenu,"バックアップを破棄してサーバーから再取得…",async()=>await ResetFromServer());
+  var displayMenu=Group("表示・作業ツリー");
+  ActionItem(displayMenu,"表示プロジェクト…",ShowProjectChoices);
+  ActionItem(displayMenu,"表示・分類設定…",ViewSettingsDialog);
+  ActionItem(displayMenu,"プロジェクトの固定色…",()=>ColorDialog());
+  ActionItem(displayMenu,"土日表示を切り替え",ToggleWeekends);
+  ActionItem(displayMenu,"1日表示",()=>SetDayView(true));ActionItem(displayMenu,"週表示",()=>SetDayView(false));
+  var zoomMenu=new MenuItem {Header="表示倍率"};displayMenu.Items.Add(zoomMenu);foreach(int percent in new[]{50,75,100,125,150,175,200,250,300,400}){int value=percent;ActionItem(zoomMenu,percent+"%",()=>SetZoom(value));}
+  ActionItem(displayMenu,"右の統計パネルを表示／非表示",()=>SetStatisticsVisible(!settings.ShowStatistics));
+  var workMenu=Group("作業・カレンダー");
+  ActionItem(workMenu,"プロジェクト追加…",async()=>await ProjectDialog());
+  ActionItem(workMenu,"休日・休み時間・時間外…",CalendarDialog);
+  ActionItem(workMenu,"時間外・休み時間の入力ロック切り替え",ToggleInputLock);
+  var reportMenu=Group("集計");ActionItem(reportMenu,"コメント別の詳細集計…",ShowDetailedStatistics);ActionItem(reportMenu,"サーバー実績集計（全ユーザー）…",ShowServerReports);
+  var maintenance=Group("更新・配布設定");ActionItem(maintenance,"アップデートを確認",async()=>await CheckUpdates(true));
+  ActionItem(maintenance,"自動保存・キャッシュ・更新先…",SyncSettingsDialog);
+  menu.Items.Add(item);buttons.Children.Add(menu);  buttons.Children.Add(ButtonOf("再読込",async()=>await RefreshRemote()));
   buttons.Children.Add(ButtonOf("今すぐ保存",async()=>await FlushAsync(true)));
   DockPanel.SetDock(buttons,Dock.Right);top.Children.Insert(0,buttons);
   connectionBadge.Text="Kimai未接続";connectionBadge.Foreground=BrushOf("#C7D7E6");connectionBadge.VerticalAlignment=VerticalAlignment.Center;top.Children.Add(connectionBadge);
@@ -85,8 +99,9 @@ public partial class Blocks {
  }
  async Task StartupAsync() {
   try {
-   if(!File.Exists(SettingsFile)){LoadDefaults();ConnectionDialog();_ = CheckUpdates(false);return;}
+   if(!File.Exists(SettingsFile)){LoadDefaults();ApplyStartupOverrides();RestoreViewPreferences();ConnectionDialog();_ = CheckUpdates(false);return;}
    settings=JsonSerializer.Deserialize<ConnectionSettings>(File.ReadAllText(SettingsFile))??new ConnectionSettings();
+   ApplyStartupOverrides();
    RestoreViewPreferences();AccountProfile.Migrate(settings);PortableToken.Migrate(settings,DataDirectory);StoreSettings();_ = CheckUpdates(false);
    if(settings.UserId>0)LoadAccount(settings.Url,settings.UserId);
    await ConnectAsync();
@@ -232,4 +247,6 @@ public partial class Blocks {
  internal static bool SameValues(Entry a,Entry b)=>a.ProjectId==b.ProjectId&&a.ActivityId==b.ActivityId&&a.Start==b.Start&&a.Minutes==b.Minutes&&(a.Note??"")==(b.Note??"");
  void StoreSettings() {PortableToken.Migrate(settings,DataDirectory);Directory.CreateDirectory(DataDirectory);File.WriteAllText(SettingsFile+".tmp",JsonSerializer.Serialize(settings));File.Move(SettingsFile+".tmp",SettingsFile,true);}
 }
+
+
 

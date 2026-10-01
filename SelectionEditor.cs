@@ -45,10 +45,10 @@ public partial class Blocks {
  void BeginInlineComment(Entry en) {
   if(!CanEdit(en)||!ApplyEditor()||!entryBoxes.TryGetValue(en,out var box))return;
   selectedKeys.Clear();selectedKeys.Add(EditingModel.Key(en));selected=en;RefreshSelection();
-  inlineEntry=en;inlineComment=new TextBox {Text=en.Note,AcceptsReturn=true,TextWrapping=TextWrapping.Wrap,Height=100,Width=Math.Max(180,Math.Min(420,DayWidth-6)),VerticalScrollBarVisibility=ScrollBarVisibility.Auto,Padding=new Thickness(6),Background=Brushes.White,ToolTip="Ctrl+Enter: 適用 / Esc: キャンセル"};
+  inlineEntry=en;inlineComment=new TextBox {Text=en.Note,AcceptsReturn=true,TextWrapping=TextWrapping.Wrap,Height=100,Width=Math.Max(180,Math.Min(420,DayWidth-6)),VerticalScrollBarVisibility=ScrollBarVisibility.Auto,Padding=new Thickness(6),Background=Brushes.White,ToolTip="Enter: 確定 / Ctrl+Enter: 改行 / Esc: キャンセル"};
   Canvas.SetLeft(inlineComment,Canvas.GetLeft(box));Canvas.SetTop(inlineComment,Canvas.GetTop(box));Panel.SetZIndex(inlineComment,2000);board.Children.Add(inlineComment);inlineComment.TextChanged+=(s,e)=>editorDirty=true;
-  inlineComment.PreviewKeyDown+=(s,e)=>{if(e.Key==Key.Escape){e.Handled=true;FinishInline(false);}else if(e.Key==Key.Enter&&Keyboard.Modifiers.HasFlag(ModifierKeys.Control)){e.Handled=true;FinishInline(true);}};
-  inlineComment.LostKeyboardFocus+=(s,e)=>{if(!finishingInline)FinishInline(true);};inlineComment.Focus();inlineComment.SelectAll();
+  inlineComment.PreviewKeyDown+=(s,e)=>{if(e.Key==Key.Escape){e.Handled=true;FinishInline(false);}else if(e.Key==Key.Enter){e.Handled=true;if(Keyboard.Modifiers.HasFlag(ModifierKeys.Control)){int caret=inlineComment.SelectionStart;inlineComment.SelectedText=Environment.NewLine;inlineComment.Select(caret+Environment.NewLine.Length,0);}else FinishInline(true);}};
+  var field=inlineComment;field.LostKeyboardFocus+=(s,e)=>{if(!finishingInline&&ReferenceEquals(inlineComment,field))FinishInline(true);};field.Focus();if(ReferenceEquals(inlineComment,field))field.SelectAll();
  }
  bool FinishInline(bool apply) {
   if(inlineComment==null)return true;finishingInline=true;
@@ -56,4 +56,5 @@ public partial class Blocks {
   finally {finishingInline=false;}
  }
 }
+
 

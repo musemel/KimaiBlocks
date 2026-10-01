@@ -48,11 +48,8 @@ public partial class Blocks {
   var w=new Window {Title="設定 / アカウント",Owner=this,Width=880,Height=750,MinWidth=740,MinHeight=620,WindowStartupLocation=WindowStartupLocation.CenterOwner};
   var panel=new DockPanel {Margin=new Thickness(20)};w.Content=panel;
   var bottom=new StackPanel();DockPanel.SetDock(bottom,Dock.Bottom);panel.Children.Add(bottom);
-  var seconds=new TextBox {Text=settings.SaveSeconds.ToString(),Width=100};var minutes=new TextBox {Text=settings.CatalogMinutes.ToString(),Width=100};
-  var options=new WrapPanel();options.Children.Add(Label("保存間隔（秒、10〜3600）",12));options.Children.Add(seconds);options.Children.Add(Label("一覧キャッシュ（分、1〜1440）",12));options.Children.Add(minutes);bottom.Children.Add(options);
-  bottom.Children.Add(Label("アップデート確認フォルダ（空欄で無効・UNCパス可）",12));var updateFolder=new TextBox {Text=settings.UpdateFolder,Margin=new Thickness(4)};bottom.Children.Add(updateFolder);
-  var weekends=new CheckBox {Content="カレンダーに土日を表示",IsChecked=settings.ShowWeekends,Margin=new Thickness(4,12,4,8)};bottom.Children.Add(weekends);
-  bottom.Children.Add(ButtonOf("休日・休み時間・時間外の設定…",CalendarDialog));
+  bottom.Children.Add(ButtonOf("自動保存・キャッシュ・更新先…",SyncSettingsDialog));
+  bottom.Children.Add(ButtonOf("表示・作業ツリーの設定…",ViewSettingsDialog));
   var note=Label("一覧からアカウントを選んで「選択したアカウントで保存して接続」を押してください。\nBearer認証ではAPIトークンが接続ユーザーを決定します。ユーザー名は管理用の表示です。\nトークン入力は表示されます。AppDataのフォルダ全体をコピーして設定を移行できます。",12);note.TextWrapping=TextWrapping.Wrap;bottom.Children.Add(note);
   var heading=Label("接続アカウント",17);DockPanel.SetDock(heading,Dock.Top);panel.Children.Add(heading);
   var actions=new StackPanel {Orientation=Orientation.Horizontal};DockPanel.SetDock(actions,Dock.Top);panel.Children.Add(actions);
@@ -68,14 +65,14 @@ public partial class Blocks {
   bottom.Children.Add(ButtonOf("選択したアカウントで保存して接続",async()=>{
    var account=table.SelectedItem as AccountProfile;
    if(account==null){MessageBox.Show(w,"接続するアカウントを追加・選択してください。");return;}
-   if(!int.TryParse(seconds.Text,out int sec)||sec<10||sec>3600||!int.TryParse(minutes.Text,out int min)||min<1||min>1440){MessageBox.Show(w,"保存間隔とキャッシュ期間を範囲内で指定してください。");return;}
    if(state.Pending.Count>0){MessageBox.Show(w,"未保存の実績があります。設定画面を閉じ、「今すぐ保存」を完了してから切り替えてください。","アカウント切替を中止");return;}
    var previous=settings;
    try {
     // Persist current-account UI settings before releasing the old account.
     Persist();
     var updated=JsonSerializer.Deserialize<ConnectionSettings>(JsonSerializer.Serialize(settings));
-    updated.UpdateFolder=updateFolder.Text.Trim();updated.Accounts=accounts.Select(a=>a.Copy()).ToList();updated.SaveSeconds=sec;updated.CatalogMinutes=min;updated.ShowWeekends=weekends.IsChecked==true;AccountProfile.Select(updated,updated.Accounts.Single(a=>a.Id==account.Id));
+
+    updated.Accounts=accounts.Select(a=>a.Copy()).ToList();AccountProfile.Select(updated,updated.Accounts.Single(a=>a.Id==account.Id));
     settings=updated;try {StoreSettings();}catch {settings=previous;throw;}
     service?.Dispose();service=null;needsRefresh=true;savePaused=true;saveTimer.Stop();file=null;clipboardEntries.Clear();ClearHistory();state=new State();Projects=Array.Empty<string>();selected=null;connectionBadge.Text="接続待ち: "+account.Name;PopulateProjectList();Populate();Render();
     w.Close();await ConnectAsync();
@@ -105,4 +102,6 @@ public partial class Blocks {
   }));panel.Children.Add(ButtonOf("キャンセル",()=>w.Close()));w.ShowDialog();return result;
  }
 }
+
+
 
