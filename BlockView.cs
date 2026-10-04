@@ -24,7 +24,7 @@ public partial class Blocks {
   void ClearGhosts(){foreach(var ghost in ghosts)board.Children.Remove(ghost);ghosts.Clear();if(originals!=null)foreach(var row in originals)if(entryBoxes.TryGetValue(row,out var visual))visual.Opacity=1;}
   box.MouseLeftButtonDown+=(s,e)=>{
    e.Handled=true;if(!SelectEntry(en,Keyboard.Modifiers))return;board.Focus();if(e.ClickCount==2){Edit(en);return;}
-   if(en.ReadOnlyReason!=null||!CanEdit(en))return;origin=e.GetPosition(board);copy=Keyboard.Modifiers.HasFlag(ModifierKeys.Control);mode=copy?0:HitMode(e.GetPosition(box).Y,box.Height);moved=false;originals=null;box.CaptureMouse();dragActive=true;
+   if(en.ReadOnlyReason!=null||!CanEdit(en))return;origin=e.GetPosition(board);copy=Keyboard.Modifiers.HasFlag(ModifierKeys.Control);mode=HitMode(e.GetPosition(box).Y,box.Height);moved=false;originals=null;box.CaptureMouse();dragActive=true;
   };
   box.MouseMove+=(s,e)=>{
    box.Cursor=HitMode(e.GetPosition(box).Y,box.Height)!=0?Cursors.SizeNS:Cursors.SizeAll;
@@ -43,6 +43,7 @@ public partial class Blocks {
  }
  static Brush ReadableText(string hex){var c=(Color)ColorConverter.ConvertFromString(hex);return .2126*c.R+.7152*c.G+.0722*c.B<140?Brushes.White:Brushes.Black;}
 }
+
 
 
 

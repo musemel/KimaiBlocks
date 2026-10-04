@@ -13,8 +13,8 @@ public partial class Blocks {
   var bar=new StackPanel {Orientation=Orientation.Horizontal,Background=BrushOf("#F2F5F8"),Margin=new Thickness(0,0,0,4)};
   DockPanel.SetDock(bar,Dock.Top);root.Children.Add(bar);
   Button Icon(string name,string shortcut,string geometry,Action action) {
-   var icon=new System.Windows.Shapes.Path {Data=Geometry.Parse(geometry),Stroke=BrushOf("#29445E"),StrokeThickness=1.6,Width=18,Height=18,Stretch=Stretch.Uniform,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round};
-   var button=new Button {Content=icon,Width=36,Height=32,Margin=new Thickness(3,3,0,3),Padding=new Thickness(7),Focusable=false,ToolTip=name+" ("+shortcut+")"};
+   var icon=new System.Windows.Shapes.Path {Data=Geometry.Parse(geometry),Stroke=BrushOf("#29445E"),StrokeThickness=1.5,Width=14,Height=14,Stretch=Stretch.Uniform,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round};
+   var button=new Button {Content=icon,Width=36,Height=32,Margin=new Thickness(3,3,0,3),Padding=new Thickness(4),HorizontalContentAlignment=HorizontalAlignment.Center,VerticalContentAlignment=VerticalAlignment.Center,Focusable=false,ToolTip=name+" ("+shortcut+")"};
    AutomationProperties.SetName(button,name);AutomationProperties.SetHelpText(button,shortcut);
    button.Click+=(s,e)=>action();button.IsEnabledChanged+=(s,e)=>icon.Opacity=button.IsEnabled?1:.3;bar.Children.Add(button);return button;
   }
@@ -27,6 +27,7 @@ public partial class Blocks {
   copyButton=Icon("コピー","Ctrl+C","M 7,7 L 20,7 L 20,20 L 7,20 Z M 3,15 L 1,15 L 1,1 L 15,1 L 15,3",CopySelection);
   pasteButton=Icon("貼り付け","Ctrl+V","M 6,4 L 2,4 L 2,21 L 19,21 L 19,4 L 15,4 M 6,2 L 15,2 L 15,7 L 6,7 Z M 6,12 L 15,12 M 6,16 L 15,16",async()=>await PasteSelection());
   deleteButton=Icon("削除","Delete","M 2,5 L 20,5 M 7,5 L 7,1 L 15,1 L 15,5 M 4,5 L 5,21 L 17,21 L 18,5 M 9,9 L 9,17 M 13,9 L 13,17",async()=>await DeleteSelection());
+  Icon("再読込","サーバーから読み込み","M 18,7 A 8,8 0 1 0 19,14 M 18,1 L 18,7 L 12,7",async()=>{if(ApplyEditor())await RefreshRemote();});
   AddViewTools(bar);
   CommandManager.RequerySuggested+=ToolbarRequery;
   Closed+=(s,e)=>CommandManager.RequerySuggested-=ToolbarRequery;
@@ -51,5 +52,6 @@ public partial class Blocks {
   await ApplyBatchDrag(clipboardEntries,clipboardEntries.Select(r=>{var copy=r.Copy();copy.Start=target+(r.Start-start);return copy;}).ToList(),true);
  }
 }
+
 
 

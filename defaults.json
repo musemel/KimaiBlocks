@@ -1,4 +1,6 @@
 {
+  "ProjectPalette": 16,
+  "AvoidColorCollisions": false,
   "ActivityGroupingPattern": "(.*)/(.*)",
   "Url": "",
   "SaveSeconds": 60,
@@ -16,3 +18,4 @@
     "BlockInput": false
   }
 }
+

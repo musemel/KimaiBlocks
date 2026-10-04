@@ -20,10 +20,11 @@ public partial class Blocks {
    var rows=SelectedEntries();editorPanel.Children.Clear();editorEntry=rows.Count==1?rows[0]:null;
    editorHeading=Label(rows.Count==0?"選択中の実績なし":rows.Count+"件を選択 · "+Hours(rows.Sum(e=>e.Minutes)),14);editorHeading.FontWeight=FontWeights.SemiBold;editorPanel.Children.Add(editorHeading);
    if(rows.Count==0)return;
+   AddSelectedCommentTotals(editorPanel,rows);
    var grid=new Grid();grid.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(76)});grid.ColumnDefinitions.Add(new ColumnDefinition());editorPanel.Children.Add(grid);int row=0;
    void Field(string name,Control control){grid.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});var label=Label(name,11);Grid.SetRow(label,row);grid.Children.Add(label);Grid.SetRow(control,row++);Grid.SetColumn(control,1);control.Margin=new Thickness(2);grid.Children.Add(control);}
    if(editorEntry!=null) {
-    editorProject=new ComboBox {ItemsSource=Projects,SelectedItem=editorEntry.Project};editorActivity=new ComboBox {ItemsSource=ActivitiesFor(editorEntry.Project),SelectedItem=editorEntry.Activity};editorDate=new DatePicker {SelectedDate=editorEntry.Start.Date};editorStart=new TextBox {Text=editorEntry.Start.ToString("HH:mm")};editorMinutes=new TextBox {Text=editorEntry.Minutes.ToString()};
+    editorProject=new ProjectSearchBox(Projects,editorEntry.Project,Matches);editorActivity=new ComboBox {ItemsSource=ActivitiesFor(editorEntry.Project),SelectedItem=editorEntry.Activity};editorDate=new DatePicker {SelectedDate=editorEntry.Start.Date};editorStart=new TextBox {Text=editorEntry.Start.ToString("HH:mm")};editorMinutes=new TextBox {Text=editorEntry.Minutes.ToString()};
     Field("プロジェクト",editorProject);Field("作業",editorActivity);Field("日付",editorDate);Field("開始",editorStart);Field("分",editorMinutes);
     editorProject.SelectionChanged+=(s,e)=>{if(buildingEditor)return;editorActivity.ItemsSource=ActivitiesFor(editorProject.SelectedItem as string);editorActivity.SelectedIndex=0;editorDirty=true;};editorActivity.SelectionChanged+=(s,e)=>{if(!buildingEditor)editorDirty=true;};editorDate.SelectedDateChanged+=(s,e)=>{if(!buildingEditor)editorDirty=true;};editorStart.TextChanged+=(s,e)=>{if(!buildingEditor)editorDirty=true;};editorMinutes.TextChanged+=(s,e)=>{if(!buildingEditor)editorDirty=true;};
    }
@@ -56,5 +57,8 @@ public partial class Blocks {
   finally {finishingInline=false;}
  }
 }
+
+
+
 
 

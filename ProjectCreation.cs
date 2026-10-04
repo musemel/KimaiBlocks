@@ -28,7 +28,7 @@ public partial class Blocks {
   TextSearch.SetTextPath(customer,"Name");
   var name=new TextBox {Padding=new Thickness(6),MaxLength=150};
   var comment=new TextBox {Height=60,AcceptsReturn=true,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
-  var folder=new ComboBox {ItemsSource=new[]{"（フォルダ外）"}.Concat(state.Folders).ToArray(),SelectedIndex=0,Padding=new Thickness(6)};
+  var folder=new ComboBox {ItemsSource=new[]{new KeyValuePair<string,string>("","（フォルダ外）")}.Concat(state.Folders.Where(f=>!state.FavoriteFolders.Contains(f)).Select(f=>new KeyValuePair<string,string>(f,FolderPathLabel(f)))).ToArray(),DisplayMemberPath="Value",SelectedValuePath="Key",SelectedIndex=0,Padding=new Thickness(6)};
   panel.Children.Add(Label("追加先の顧客（入力で検索して選択）",12));panel.Children.Add(customer);
   panel.Children.Add(Label("プロジェクト名",12));panel.Children.Add(name);
   panel.Children.Add(Label("説明",12));panel.Children.Add(comment);
@@ -40,8 +40,8 @@ public partial class Blocks {
    if(submitted)return;
    var chosen=customer.SelectedItem as CustomerOption;string projectName=name.Text.Trim();
    if(chosen==null||projectName.Length==0||consent.IsChecked!=true){MessageBox.Show(w,"顧客を一覧から選択し、プロジェクト名を入力して、確認チェックを付けてください。","入力確認");return;}
-   string folderName=folder.SelectedIndex<=0?null:(string)folder.SelectedItem;
-   string summary="接続先: "+service.BaseUrl+"\n顧客: "+chosen+"\nプロジェクト: "+projectName+"\nフォルダ: "+(folderName??"フォルダ外")+"\nグローバルアクティビティ: 有効\n説明: "+comment.Text;
+   string folderName=folder.SelectedIndex<=0?null:(string)folder.SelectedValue;
+   string summary="接続先: "+service.BaseUrl+"\n顧客: "+chosen+"\nプロジェクト: "+projectName+"\nフォルダ: "+(folderName==null?"フォルダ外":FolderPathLabel(folderName))+"\nグローバルアクティビティ: 有効\n説明: "+comment.Text;
    if(MessageBox.Show(w,summary+"\n\nこの内容で作成へ進みますか？","作成内容の確認（1/2）",MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)!=MessageBoxResult.Yes)return;
    if(MessageBox.Show(w,"最終確認（2/2）\n\n「"+chosen.Name+"」に「"+projectName+"」を作成します。\n定期保存を待たずにサーバーへ送信します。\n実行してよろしいですか？","プロジェクトを作成しますか",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes)return;
    sending=true;panel.IsEnabled=false;SetCommunicating(true);ProjectEntity created=null;
@@ -65,4 +65,5 @@ public partial class Blocks {
   w.ShowDialog();
  }
 }
+
 

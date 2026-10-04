@@ -27,15 +27,15 @@ public partial class Blocks {
  void ViewSettingsDialog() {
   var w=new Window {Title="表示・作業ツリー",Owner=this,Width=540,SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner};var panel=new StackPanel {Margin=new Thickness(20)};w.Content=panel;
   var weekends=new CheckBox {Content="土日を表示",IsChecked=settings.ShowWeekends,Margin=new Thickness(4,8,4,12)};panel.Children.Add(weekends);
-  panel.Children.Add(Label("アクティビティの分類（正規表現、空欄で無効）",13));var pattern=new TextBox {Text=settings.ActivityGroupingPattern,Margin=new Thickness(4),Padding=new Thickness(6)};panel.Children.Add(pattern);
+  panel.Children.Add(Label("アクティビティの分類（正規表現、空欄で無効）",13));var pattern=new TextBox {Text=EffectiveActivityPattern,IsReadOnly=managedSettings.ActivityGroupingPattern!=null,ToolTip=managedSettings.ActivityGroupingPattern!=null?"settings.policy.jsonで管理されています":null,Margin=new Thickness(4),Padding=new Thickness(6)};panel.Children.Add(pattern);
   var help=Label("例: (.*)/(.*) → $1でまとめ、$2を子項目に表示。\n一致しない項目は元の名前で表示します。",12);help.TextWrapping=TextWrapping.Wrap;panel.Children.Add(help);
-  panel.Children.Add(ButtonOf("保存",()=>{try{_ = new ActivityGrouping(pattern.Text);var previous=settings.ActivityGroupingPattern;bool old=settings.ShowWeekends;settings.ActivityGroupingPattern=pattern.Text;settings.ShowWeekends=weekends.IsChecked==true;try{StoreSettings();}catch{settings.ActivityGroupingPattern=previous;settings.ShowWeekends=old;throw;}rangeStart=null;Populate();Render();UpdateViewTools();w.Close();}catch(Exception ex){MessageBox.Show(w,SafeError(ex),"設定を保存できません");}}));panel.Children.Add(ButtonOf("キャンセル",()=>w.Close()));w.ShowDialog();
+  panel.Children.Add(ButtonOf("保存",()=>{try{_ = new ActivityGrouping(pattern.Text);var previous=settings.ActivityGroupingPattern;bool old=settings.ShowWeekends;if(managedSettings.ActivityGroupingPattern==null)settings.ActivityGroupingPattern=pattern.Text;settings.ShowWeekends=weekends.IsChecked==true;try{StoreSettings();}catch{settings.ActivityGroupingPattern=previous;settings.ShowWeekends=old;throw;}rangeStart=null;Populate();Render();Save();UpdateViewTools();w.Close();}catch(Exception ex){MessageBox.Show(w,SafeError(ex),"設定を保存できません");}}));panel.Children.Add(ButtonOf("キャンセル",()=>w.Close()));w.ShowDialog();
  }
  void SyncSettingsDialog() {
   var w=new Window {Title="自動保存・キャッシュ・更新先",Owner=this,Width=540,SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner};var panel=new StackPanel {Margin=new Thickness(20)};w.Content=panel;
   TextBox Field(string label,string value){panel.Children.Add(Label(label,12));var input=new TextBox {Text=value,Padding=new Thickness(6),Margin=new Thickness(4)};panel.Children.Add(input);return input;}
-  var seconds=Field("保存間隔（秒、10〜3600）",settings.SaveSeconds.ToString());var minutes=Field("一覧キャッシュ（分、1〜1440）",settings.CatalogMinutes.ToString());var folder=Field("アップデート確認フォルダ（空欄で無効・UNCパス可）",settings.UpdateFolder);
-  panel.Children.Add(ButtonOf("保存",()=>{if(!int.TryParse(seconds.Text,out var sec)||sec<10||sec>3600||!int.TryParse(minutes.Text,out var min)||min<1||min>1440){MessageBox.Show(w,"保存間隔とキャッシュ期間を範囲内で指定してください。");return;}var old=settings;try{var updated=System.Text.Json.JsonSerializer.Deserialize<ConnectionSettings>(System.Text.Json.JsonSerializer.Serialize(settings));updated.SaveSeconds=sec;updated.CatalogMinutes=min;updated.UpdateFolder=folder.Text.Trim();settings=updated;try{StoreSettings();}catch{settings=old;throw;}saveTimer.Interval=TimeSpan.FromSeconds(sec);w.Close();}catch(Exception ex){MessageBox.Show(w,SafeError(ex),"設定を保存できません");}}));panel.Children.Add(ButtonOf("キャンセル",()=>w.Close()));w.ShowDialog();
+  var seconds=Field("保存間隔（秒、10〜3600）",settings.SaveSeconds.ToString());var minutes=Field("一覧キャッシュ（分、1〜1440）",settings.CatalogMinutes.ToString());var folder=Field("アップデート確認フォルダ（空欄で無効・UNCパス可）",EffectiveUpdateFolder);folder.IsReadOnly=managedSettings.UpdateFolder!=null;folder.ToolTip=managedSettings.UpdateFolder!=null?"settings.policy.jsonで管理されています":null;
+  panel.Children.Add(ButtonOf("保存",()=>{if(!int.TryParse(seconds.Text,out var sec)||sec<10||sec>3600||!int.TryParse(minutes.Text,out var min)||min<1||min>1440){MessageBox.Show(w,"保存間隔とキャッシュ期間を範囲内で指定してください。");return;}var old=settings;try{var updated=System.Text.Json.JsonSerializer.Deserialize<ConnectionSettings>(System.Text.Json.JsonSerializer.Serialize(settings));updated.SaveSeconds=sec;updated.CatalogMinutes=min;if(managedSettings.UpdateFolder==null)updated.UpdateFolder=folder.Text.Trim();settings=updated;try{StoreSettings();}catch{settings=old;throw;}saveTimer.Interval=TimeSpan.FromSeconds(sec);w.Close();}catch(Exception ex){MessageBox.Show(w,SafeError(ex),"設定を保存できません");}}));panel.Children.Add(ButtonOf("キャンセル",()=>w.Close()));w.ShowDialog();
  }
  void SetupRangeSelection() {
   DateTime anchor=default;bool selecting=false;
@@ -58,4 +58,7 @@ public partial class Blocks {
  }
  static bool IsWorkDrop(IDataObject data)=>data.GetDataPresent("work")||data.GetDataPresent("project")||data.GetDataPresent("work-group");
 }
+
+
+
 

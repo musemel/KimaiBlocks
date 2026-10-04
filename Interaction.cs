@@ -59,9 +59,10 @@ public partial class Blocks {
    else if(ctrl&&(e.Key==Key.Add||e.Key==Key.OemPlus)){e.Handled=true;SetZoom(Hour/144*100+25);}
    else if(ctrl&&(e.Key==Key.Subtract||e.Key==Key.OemMinus)){e.Handled=true;SetZoom(Hour/144*100-25);}
   };
-  calendarScroll.PreviewMouseWheel+=(s,e)=>{if(Keyboard.Modifiers.HasFlag(ModifierKeys.Control)){e.Handled=true;SetZoom(Hour/144*100+(e.Delta>0?25:-25),e.GetPosition(calendarScroll).Y);}};
+  calendarScroll.PreviewMouseLeftButtonDown+=(s,e)=>{if(zoomScale!=1)SetZoom(Hour/144*100*zoomScale,zoomAnchor);};
+  calendarScroll.PreviewMouseWheel+=(s,e)=>{if(Keyboard.Modifiers.HasFlag(ModifierKeys.Control)){e.Handled=true;PreviewZoom(e.Delta,e.GetPosition(calendarScroll).Y);}};
  }
- void SetZoom(double percent,double anchor=0) {if(dragActive)return;double minute=(calendarScroll.VerticalOffset+anchor)/Hour;Hour=144*Math.Clamp(percent,50,400)/100;board.Height=24*Hour;Render();calendarScroll.ScrollToVerticalOffset(Math.Max(0,minute*Hour-anchor));settings.ZoomPercent=(int)Math.Round(Hour/144*100);SaveViewPreferences();status.Text="表示倍率 "+settings.ZoomPercent+"%";}
+ void SetZoom(double percent,double anchor=0) {if(dragActive||!ApplyEditor())return;double minute=(calendarScroll.VerticalOffset+anchor)/(Hour*zoomScale);zoomTimer.Stop();zoomScale=1;board.LayoutTransform=Transform.Identity;Hour=144*Math.Clamp(percent,50,400)/100;board.Height=24*Hour;Render();calendarScroll.UpdateLayout();calendarScroll.ScrollToVerticalOffset(Math.Max(0,minute*Hour-anchor));settings.ZoomPercent=(int)Math.Round(Hour/144*100);SaveViewPreferences();status.Text="表示倍率 "+settings.ZoomPercent+"%";}
  void AddPanelResizer(DockPanel root,FrameworkElement panel,Dock side) {
   var grip=new Thumb {Width=6,Background=BrushOf("#DCE3EA"),Cursor=Cursors.SizeWE};DockPanel.SetDock(grip,side);root.Children.Add(grip);
   grip.DragDelta+=(s,e)=>panel.Width=Math.Clamp(panel.Width+(side==Dock.Left?e.HorizontalChange:-e.HorizontalChange),200,Math.Min(600,Math.Max(220,ActualWidth*.38)));
@@ -84,9 +85,11 @@ public partial class Blocks {
    int begin=0;if(!copy){var old=originals[i];var before=old.Copy();RestoreEntry(old,planned[i][0]);PendingQueue.Edit(state.Pending,old,before);selectedKeys.Add(EditingModel.Key(old));begin=1;}
    foreach(var part in planned[i].Skip(begin)){state.Entries.Add(part);PendingQueue.Edit(state.Pending,part,null);selectedKeys.Add(EditingModel.Key(part));}
   }
-  selected=SelectedEntries().FirstOrDefault();if(selected!=null)statisticsDay=selected.Start.Date;Save();Render();status.Text="選択実績を"+(copy?"コピー":"変更")+"しました · 重複・入力禁止時間を除外 · 保存待ち";await Task.CompletedTask;
+  selected=SelectedEntries().FirstOrDefault();if(selected!=null)statisticsDay=selected.Start.Date;if(copy||planned.Any(parts=>parts.Count>1)){selectedKeys.Clear();selected=null;selectionAnchor=null;editorDirty=false;}Save();Render();status.Text="選択実績を"+(copy?"コピー":"変更")+"しました · 重複・入力禁止時間を除外 · 保存待ち";await Task.CompletedTask;
  }
 }
+
+
 
 
 

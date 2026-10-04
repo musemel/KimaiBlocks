@@ -34,11 +34,19 @@ using System.Windows.Media;
  [DataMember] public Dictionary<string,string> ProjectFolders = new Dictionary<string,string>();
  [DataMember] public List<string> Collapsed = new List<string>();
  [DataMember] public Dictionary<string,string> FixedColors = new Dictionary<string,string>();
+ [DataMember] public Dictionary<string,string> AutoColors = new Dictionary<string,string>();
+ [DataMember] public Dictionary<string,string> FolderParents = new Dictionary<string,string>();
+ [DataMember] public Dictionary<string,string> FolderLabels = new Dictionary<string,string>();
+ [DataMember] public Dictionary<string,List<WorkLink>> FolderWorks = new Dictionary<string,List<WorkLink>>();
+ [DataMember] public List<string> FavoriteFolders = new List<string>();
+ [DataMember] public List<string> ExpandedNodes = new List<string>();
  [DataMember] public List<PendingChange> Pending = new List<PendingChange>();
  [DataMember(EmitDefaultValue=false)] public DateTime CachedWeek;
  [DataMember] public string[] CachedProjects = Array.Empty<string>();
  [OnDeserialized] void Upgrade(StreamingContext context) {
   FixedColors ??= new Dictionary<string,string>();
+  AutoColors ??= new Dictionary<string,string>();
+  FolderParents ??= new Dictionary<string,string>();FolderLabels ??= new Dictionary<string,string>();FolderWorks ??= new Dictionary<string,List<WorkLink>>();FavoriteFolders ??= new List<string>();ExpandedNodes ??= new List<string>();
   Pending = Pending ?? new List<PendingChange>();
   CachedProjects = CachedProjects ?? Array.Empty<string>();
   Folders = Folders ?? new List<string>();
@@ -46,6 +54,10 @@ using System.Windows.Media;
   Collapsed = Collapsed ?? new List<string>();
  }
  public void RemoveFolder(string name) {
+  string parent=FolderParents.GetValueOrDefault(name);
+  foreach(var child in FolderParents.Where(x=>x.Value==name).Select(x=>x.Key).ToArray()){if(parent==null)FolderParents.Remove(child);else FolderParents[child]=parent;}
+  foreach(var project in ProjectFolders.Where(x=>x.Value==name).Select(x=>x.Key).ToArray()){if(parent==null)ProjectFolders.Remove(project);else ProjectFolders[project]=parent;}
+  FolderParents.Remove(name);FolderLabels.Remove(name);FolderWorks.Remove(name);FavoriteFolders.Remove(name);ExpandedNodes.Remove("folder:"+name);
   Folders.Remove(name);
   foreach(var project in ProjectFolders.Where(x=>x.Value==name).Select(x=>x.Key).ToList()) ProjectFolders.Remove(project);
   Collapsed.Remove("folder:"+name);
@@ -129,11 +141,11 @@ public partial class Blocks : Window {
    var entries=VisibleEntries();RenderStatistics(entries);total.Text="週合計  "+(entries.Sum(x=>x.Minutes)/60.0).ToString("0.##")+" h  ·  5分刻み";
    DrawUnavailable();
    for(int d=0;d<DisplayDayCount;d++) {headers.ColumnDefinitions.Add(new ColumnDefinition());var h=Label(DisplayStart.AddDays(d).ToString("M/d (ddd)"),14);h.HorizontalAlignment=HorizontalAlignment.Center;if(DisplayStart.AddDays(d)==DateTime.Today)h.Foreground=BrushOf("#1971C2");DateTime headerDay=DisplayStart.AddDays(d);h.Cursor=Cursors.Hand;h.ToolTip="この日の統計を表示";h.MouseLeftButtonDown+=(s,e)=>{statisticsDay=headerDay;SetStatisticsVisible(true);statisticsTabs.SelectedIndex=1;RenderStatistics(VisibleEntries());};Grid.SetColumn(h,d+1);headers.Children.Add(h);var line=new Border{Width=1,Height=board.Height,Background=BrushOf("#E8EDF2")};Canvas.SetLeft(line,Gutter+d*DayWidth);board.Children.Add(line);}
-   for(int h=0;h<24;h++) {var t=Label(h.ToString("00")+":00",11);Canvas.SetTop(t,h*Hour);board.Children.Add(t);var line=new Border {Height=1,Width=DisplayDayCount*DayWidth,Background=BrushOf("#E8EDF2")};Canvas.SetLeft(line,Gutter);Canvas.SetTop(line,h*Hour);board.Children.Add(line);}
+   for(int h=0;h<24;h++) {var line=new Border {Height=1,Width=DisplayDayCount*DayWidth,Background=BrushOf("#E8EDF2")};Canvas.SetLeft(line,Gutter);Canvas.SetTop(line,h*Hour);board.Children.Add(line);}
    for(int minute=SlotMinutes;minute<1440;minute+=SlotMinutes) { if(minute%60==0)continue;var line=new Border { Height=1, Width=DisplayDayCount*DayWidth, Background=BrushOf(minute%30==0?"#DCE4ED":"#F0F3F7"), IsHitTestVisible=false }; Canvas.SetLeft(line,Gutter);Canvas.SetTop(line,minute/60.0*Hour);board.Children.Add(line); }
    DrawSelectedRange();
    foreach(var en in entries.Where(e=>e.Start.Date>=DisplayStart&&(e.Start.Date-DisplayStart).Days<DisplayDayCount)) DrawEntry(en,entries);
-   DrawNow();RefreshSelection();
+   DrawTimeLabels();DrawNow();RefreshSelection();
   } finally {busy=false;}
  }
  async void DropWork(object sender,DragEventArgs e) {
@@ -147,12 +159,14 @@ public partial class Blocks : Window {
  void Edit(Entry en) {
   if(!CanEdit(en))return;Entry before=en.Copy();
   var w=new Window {Title="実績を編集",Width=380,Height=570,Owner=this,WindowStartupLocation=WindowStartupLocation.CenterOwner,ResizeMode=ResizeMode.NoResize};var panel=new StackPanel {Margin=new Thickness(22)};w.Content=panel;
-  var project=new ComboBox {ItemsSource=Projects,SelectedItem=en.Project};var activity=new ComboBox {ItemsSource=ActivitiesFor(en.Project),SelectedItem=en.Activity};var date=new DatePicker {SelectedDate=en.Start.Date};var start=new TextBox {Text=en.Start.ToString("HH:mm")};var minutes=new TextBox {Text=en.Minutes.ToString()};var note=new TextBox {Text=en.Note,Height=65,AcceptsReturn=true,TextWrapping=TextWrapping.Wrap,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
+  var project=new ProjectSearchBox(Projects,en.Project,Matches);var activity=new ComboBox {ItemsSource=ActivitiesFor(en.Project),SelectedItem=en.Activity};var date=new DatePicker {SelectedDate=en.Start.Date};var start=new TextBox {Text=en.Start.ToString("HH:mm")};var minutes=new TextBox {Text=en.Minutes.ToString()};var note=new TextBox {Text=en.Note,Height=65,AcceptsReturn=true,TextWrapping=TextWrapping.Wrap,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
   project.SelectionChanged+=(s,e)=>{activity.ItemsSource=ActivitiesFor((string)project.SelectedItem);activity.SelectedIndex=0;};
   string[] labels={"プロジェクト","アクティビティ","日付（未来も入力できます）","開始時刻 HH:mm","時間（分・5分単位）","コメント"};Control[] fields={project,activity,date,start,minutes,note};for(int i=0;i<fields.Length;i++){panel.Children.Add(Label(labels[i],12));panel.Children.Add(fields[i]);}
   panel.Children.Add(ButtonOf("保存",async()=>{TimeSpan t;int m;if(project.SelectedItem==null||activity.SelectedItem==null||!date.SelectedDate.HasValue||!TimeSpan.TryParse(start.Text,out t)||!int.TryParse(minutes.Text,out m)||!ValidTime(t,m)){MessageBox.Show(w,"時刻と時間は5分単位で、終了は当日24:00までに設定してください。");return;}var desired=en.Copy();desired.Project=(string)project.SelectedItem;desired.Activity=(string)activity.SelectedItem;desired.Start=date.SelectedDate.Value.Date+t;desired.Minutes=m;desired.Note=note.Text;if(!AssignIds(desired))return;RestoreEntry(en,desired);w.Close();await CommitEntry(en,before);}));w.Loaded+=(s,e)=>{note.Focus();note.SelectAll();};w.ShowDialog();
  }
 }
+
+
 
 
 

@@ -1,0 +1,4 @@
+{
+  "UpdateFolder": "\\\\server\\apps\\KimaiBlocks",
+  "ActivityGroupingPattern": "(.*)/(.*)"
+}

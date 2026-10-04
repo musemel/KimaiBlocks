@@ -11,6 +11,8 @@ using System.Windows.Media;
 using System.Windows.Threading;
 
 public sealed class DistributionDefaults {
+ public int ProjectPalette {get;set;}=16;
+ public bool AvoidColorCollisions {get;set;}=false;
  public string ActivityGroupingPattern {get;set;}=ActivityGrouping.DefaultPattern;
  public CalendarRules Calendar {get;set;}=new CalendarRules();
  public string Url {get;set;}="";
@@ -20,21 +22,22 @@ public sealed class DistributionDefaults {
 }
 public partial class Blocks {
  static string AppVersion=>Assembly.GetExecutingAssembly().GetName().Version.ToString();
- readonly DispatcherTimer clockTimer=new DispatcherTimer {Interval=TimeSpan.FromSeconds(30)};
- Border nowLine;TextBlock nowLabel;
+ readonly DispatcherTimer clockTimer=new DispatcherTimer {Interval=TimeSpan.FromSeconds(1)};
+ Border nowLine;TextBlock rightClock;
  void StartClock(){clockTimer.Tick+=(s,e)=>DrawNow();clockTimer.Start();}
  void DrawNow() {
-  if(nowLine!=null)board.Children.Remove(nowLine);if(nowLabel!=null)board.Children.Remove(nowLabel);
+  if(nowLine!=null)board.Children.Remove(nowLine);
   DateTime now=DateTime.Now;
   try {if(!string.IsNullOrEmpty(service?.Me?.Timezone))now=TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,TimeZoneInfo.FindSystemTimeZoneById(service.Me.Timezone));}catch(TimeZoneNotFoundException){}catch(InvalidTimeZoneException){}
+  if(rightClock!=null)rightClock.Text=now.ToString("M/d (ddd)  HH:mm:ss");
   int day=(now.Date-DisplayStart).Days;if(day<0||day>=DisplayDayCount)return;
   double y=now.TimeOfDay.TotalHours*Hour;
   nowLine=new Border {Height=2,Width=DayWidth,Background=Brushes.Crimson,IsHitTestVisible=false};Canvas.SetLeft(nowLine,Gutter+day*DayWidth);Canvas.SetTop(nowLine,y);Panel.SetZIndex(nowLine,1000);board.Children.Add(nowLine);
-  nowLabel=new TextBlock {Text=now.ToString("HH:mm"),Foreground=Brushes.White,Background=Brushes.Crimson,FontSize=11,Padding=new Thickness(2),IsHitTestVisible=false};Canvas.SetLeft(nowLabel,Gutter+day*DayWidth);Canvas.SetTop(nowLabel,Math.Max(0,y-18));Panel.SetZIndex(nowLabel,1001);board.Children.Add(nowLabel);
  }
  void LoadDefaults() {
   string path=Path.Combine(AppContext.BaseDirectory,"defaults.json");if(!File.Exists(path))return;
   var value=JsonSerializer.Deserialize<DistributionDefaults>(File.ReadAllText(path),new JsonSerializerOptions {PropertyNameCaseInsensitive=true})??new DistributionDefaults();
+  settings.ProjectPalette=new[]{0,16,256}.Contains(value.ProjectPalette)?value.ProjectPalette:16;settings.AvoidColorCollisions=value.AvoidColorCollisions;
   var calendar=value.Calendar??new CalendarRules();calendar.Intervals();calendar.HolidayDates();settings.Calendar=calendar;
   _ = new ActivityGrouping(value.ActivityGroupingPattern);settings.ActivityGroupingPattern=value.ActivityGroupingPattern;
   settings.Url=value.Url??"";settings.SaveSeconds=Math.Clamp(value.SaveSeconds,10,3600);settings.CatalogMinutes=Math.Clamp(value.CatalogMinutes,1,1440);settings.UpdateFolder=value.UpdateFolder??"";
@@ -42,15 +45,15 @@ public partial class Blocks {
  bool checkingUpdates;
  async Task CheckUpdates(bool manual) {
   if(checkingUpdates)return;
-  if(string.IsNullOrWhiteSpace(settings.UpdateFolder)){if(manual)MessageBox.Show(this,"設定でアップデート確認フォルダを指定してください。","アップデート");return;}
-  checkingUpdates=true;string folder=settings.UpdateFolder;
+  if(string.IsNullOrWhiteSpace(EffectiveUpdateFolder)){if(manual)MessageBox.Show(this,"設定でアップデート確認フォルダを指定してください。","アップデート");return;}
+  checkingUpdates=true;string folder=EffectiveUpdateFolder;
   try {
    var read=Task.Run(()=>{try {return (Version:UpdateVersion.Read(folder),Error:(string)null);}catch(Exception){return (Version:(Version)null,Error:"確認先のKimaiBlocks.dll または KimaiBlocks.exe のバージョンを読み込めません。パスとアクセス権を確認してください。");}});
    if(await Task.WhenAny(read,Task.Delay(TimeSpan.FromSeconds(8)))!=read){if(manual)MessageBox.Show(this,"確認がタイムアウトしました。","アップデート");return;}
    var result=await read;
    if(!IsVisible)return;
    if(result.Error!=null){if(manual)MessageBox.Show(this,result.Error,"アップデート");return;}
-   if(result.Version>Version.Parse(AppVersion)){try{StageUpdateOverride(folder,result.Version);}catch(Exception ex){MessageBox.Show(this,SafeError(ex),"更新用の上書き設定をコピーできません");}MessageBox.Show(this,"新しいバージョンがあります: "+result.Version+"\n現在: "+AppVersion+"\n配布フォルダ: "+folder+"\n保存して終了後、配布フォルダの一式をコピーして更新してください。\n配布元のsettings.override.jsonがあれば取り込み、更新後の初回起動時に適用します。","アップデートのお知らせ");}
+   if(result.Version>Version.Parse(AppVersion)){MessageBox.Show(this,"新しいバージョンがあります: "+result.Version+"\n現在: "+AppVersion+"\n配布フォルダ: "+folder+"\n保存して終了後、配布フォルダの一式をコピーして更新してください。\n管理設定がある場合はsettings.policy.jsonも一緒にコピーしてください。","アップデートのお知らせ");}
    else if(manual)MessageBox.Show(this,"確認先に新しいバージョンはありません。現在: "+AppVersion,"アップデート");
   }finally {checkingUpdates=false;}
  }
@@ -90,6 +93,9 @@ public partial class Blocks {
   finally {candidate?.Dispose();EndProgress();Populate();PopulateProjectList();Render();}
  }
 }
+
+
+
 
 
 

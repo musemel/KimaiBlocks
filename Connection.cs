@@ -20,7 +20,8 @@ using System.Windows.Threading;
  [DataMember] public bool Attempted;
 }
 public sealed class ConnectionSettings {
- public string StagedOverrideVersion {get;set;}="";
+ public int ProjectPalette {get;set;}=16;
+ public bool AvoidColorCollisions {get;set;}=false;
  public string ActivityGroupingPattern {get;set;}=ActivityGrouping.DefaultPattern;
  public List<AccountProfile> Accounts {get;set;}=new List<AccountProfile>();
  public string ActiveAccountId {get;set;}="";
@@ -69,8 +70,8 @@ public partial class Blocks {
   ActionItem(displayMenu,"表示プロジェクト…",ShowProjectChoices);
   ActionItem(displayMenu,"表示・分類設定…",ViewSettingsDialog);
   ActionItem(displayMenu,"プロジェクトの固定色…",()=>ColorDialog());
-  ActionItem(displayMenu,"土日表示を切り替え",ToggleWeekends);
-  ActionItem(displayMenu,"1日表示",()=>SetDayView(true));ActionItem(displayMenu,"週表示",()=>SetDayView(false));
+
+
   var zoomMenu=new MenuItem {Header="表示倍率"};displayMenu.Items.Add(zoomMenu);foreach(int percent in new[]{50,75,100,125,150,175,200,250,300,400}){int value=percent;ActionItem(zoomMenu,percent+"%",()=>SetZoom(value));}
   ActionItem(displayMenu,"右の統計パネルを表示／非表示",()=>SetStatisticsVisible(!settings.ShowStatistics));
   var workMenu=Group("作業・カレンダー");
@@ -80,8 +81,8 @@ public partial class Blocks {
   var reportMenu=Group("集計");ActionItem(reportMenu,"コメント別の詳細集計…",ShowDetailedStatistics);ActionItem(reportMenu,"サーバー実績集計（全ユーザー）…",ShowServerReports);
   var maintenance=Group("更新・配布設定");ActionItem(maintenance,"アップデートを確認",async()=>await CheckUpdates(true));
   ActionItem(maintenance,"自動保存・キャッシュ・更新先…",SyncSettingsDialog);
-  menu.Items.Add(item);buttons.Children.Add(menu);  buttons.Children.Add(ButtonOf("再読込",async()=>await RefreshRemote()));
-  buttons.Children.Add(ButtonOf("今すぐ保存",async()=>await FlushAsync(true)));
+  menu.Items.Add(item);rightClock=Label("",15);rightClock.Foreground=BrushOf("#D9E6F1");rightClock.Margin=new Thickness(10,0,18,0);buttons.Children.Add(rightClock);buttons.Children.Add(menu);
+
   DockPanel.SetDock(buttons,Dock.Right);top.Children.Insert(0,buttons);
   connectionBadge.Text="Kimai未接続";connectionBadge.Foreground=BrushOf("#C7D7E6");connectionBadge.VerticalAlignment=VerticalAlignment.Center;top.Children.Add(connectionBadge);
   saveTimer.Tick+=async(s,e)=>{if(inlineComment==null&&!editorDirty&&!dragActive&&!communicating&&!savePaused&&!closingRequested&&OwnedWindows.Count==0&&state.Pending.Count>0)await FlushAsync(false);};
@@ -176,7 +177,7 @@ public partial class Blocks {
    if(before!=null){RestoreEntry(en,parts[0]);PendingQueue.Edit(state.Pending,en,before);foreach(var part in parts.Skip(1)){state.Entries.Add(part);PendingQueue.Edit(state.Pending,part,null);}}
    else {RestoreEntry(en,parts[0]);state.Entries.Add(en);PendingQueue.Edit(state.Pending,en,null);foreach(var part in parts.Skip(1)){state.Entries.Add(part);PendingQueue.Edit(state.Pending,part,null);}}
   }else {if(SameValues(desired,before)){RestoreEntry(en,desired);return Task.CompletedTask;}Remember();RestoreEntry(en,desired);PendingQueue.Edit(state.Pending,en,before);}
-  Save();Render();status.Text="未保存 "+state.Pending.Count+" 件 · "+settings.SaveSeconds+"秒ごとに保存";return Task.CompletedTask;
+  if(before==null){selectedKeys.Clear();selected=null;selectionAnchor=null;editorDirty=false;}Save();Render();status.Text="未保存 "+state.Pending.Count+" 件 · "+settings.SaveSeconds+"秒ごとに保存";return Task.CompletedTask;
  }
  Task DeleteEntry(Entry en) {if(!selectedKeys.Contains(EditingModel.Key(en))){selectedKeys.Clear();selectedKeys.Add(EditingModel.Key(en));selected=en;}return DeleteSelection();}
  async Task<bool> FlushAsync(bool manual) {
@@ -247,6 +248,8 @@ public partial class Blocks {
  internal static bool SameValues(Entry a,Entry b)=>a.ProjectId==b.ProjectId&&a.ActivityId==b.ActivityId&&a.Start==b.Start&&a.Minutes==b.Minutes&&(a.Note??"")==(b.Note??"");
  void StoreSettings() {PortableToken.Migrate(settings,DataDirectory);Directory.CreateDirectory(DataDirectory);File.WriteAllText(SettingsFile+".tmp",JsonSerializer.Serialize(settings));File.Move(SettingsFile+".tmp",SettingsFile,true);}
 }
+
+
 
 
 

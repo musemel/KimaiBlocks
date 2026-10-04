@@ -16,7 +16,7 @@ public partial class Blocks {
  void BuildStatistics(DockPanel root) {
   var panel=new DockPanel {Width=320,Margin=new Thickness(0,0,12,0),Background=Brushes.White};
   statisticsPanel=panel;
-  var close=ButtonOf("×",()=>SetStatisticsVisible(false));close.HorizontalAlignment=HorizontalAlignment.Right;close.ToolTip="統計を閉じる（メニューから再表示）";DockPanel.SetDock(close,Dock.Top);panel.Children.Add(close);
+  var close=ButtonOf("×",()=>SetStatisticsVisible(false));close.HorizontalAlignment=HorizontalAlignment.Right;close.ToolTip="統計を閉じる（メニューから再表示）";var clockRow=new DockPanel();DockPanel.SetDock(clockRow,Dock.Top);DockPanel.SetDock(close,Dock.Right);clockRow.Children.Add(close);panel.Children.Add(clockRow);
   DockPanel.SetDock(panel,Dock.Right);root.Children.Add(panel);AddPanelResizer(root,panel,Dock.Right);BuildEditor(panel);
   var detail=ButtonOf("コメント別の詳細集計…",ShowDetailedStatistics);DockPanel.SetDock(detail,Dock.Top);panel.Children.Add(detail);
   var heading=Label("実績の統計",17);heading.Margin=new Thickness(12,12,12,8);DockPanel.SetDock(heading,Dock.Top);panel.Children.Add(heading);
@@ -99,4 +99,6 @@ public partial class Blocks {
   panel.Children.Add(Label(entries.Count+" ブロック · "+entries.Sum(e=>e.Minutes)+" 分",11));
  }
 }
+
+
 
