@@ -15,14 +15,15 @@ public partial class Blocks {
   ToggleButton Toggle(string text,string help,Action action){var b=new ToggleButton {Content=text,ToolTip=help,Height=30,Padding=new Thickness(9,3,9,3),Margin=new Thickness(3),Focusable=false};b.Click+=(s,e)=>action();bar.Children.Add(b);return b;}
   weekendToggle=Toggle("▦ 土日","土日の表示／非表示",ToggleWeekends);
   dayToggle=Toggle("▣ 日","選択した実績・時間範囲・日集計の日を1列で拡大表示",()=>SetDayView(true));
-  weekToggle=Toggle("▥ 週","週単位で表示",()=>SetDayView(false));
+  weekToggle=Toggle("▥ 週","週単位で表示",async()=>{if(customFrom.HasValue)await ChangeWeek(Monday(DisplayStart));SetDayView(false);});
+  bar.Children.Add(ButtonOf("期間…",SelectRange));bar.Children.Add(ButtonOf("先週と比較",async()=>await ShowPreviousWeek()));
   lockToggle=Toggle("入力ロック","休日・休み時間・時間外への入力を禁止／解除（既存実績は維持）",ToggleInputLock);UpdateViewTools();
  }
- void UpdateViewTools(){if(weekendToggle==null)return;weekendToggle.IsChecked=settings.ShowWeekends;dayToggle.IsChecked=dayView;weekToggle.IsChecked=!dayView;lockToggle.IsChecked=Rules.BlockInput;}
+ void UpdateViewTools(){if(weekendToggle==null)return;weekendToggle.IsChecked=settings.ShowWeekends;dayToggle.IsChecked=dayView;weekToggle.IsChecked=!dayView&&!customFrom.HasValue;lockToggle.IsChecked=Rules.BlockInput;}
  void ToggleWeekends(){if(!ApplyEditor())return;settings.ShowWeekends=!settings.ShowWeekends;rangeStart=null;SaveViewPreferences();Render();UpdateViewTools();}
  void ToggleInputLock(){if(!ApplyEditor())return;Rules.BlockInput=!Rules.BlockInput;SaveViewPreferences();Render();UpdateViewTools();}
- void SetDayView(bool value){if(!ApplyEditor()||dragActive)return;displayDay=selected?.Start.Date??rangeStart?.Date??statisticsDay;if(displayDay<week||displayDay>=week.AddDays(7))displayDay=DateTime.Today>=week&&DateTime.Today<week.AddDays(7)?DateTime.Today:week;dayView=value;if(value){statisticsDay=displayDay;statisticsTabs.SelectedIndex=1;}rangeStart=null;pasteTime=null;Render();UpdateViewTools();}
- async Task NavigateCalendar(int delta){if(!dayView){await ChangeWeek(week.AddDays(delta*7));return;}var target=DisplayStart.AddDays(delta);if(Monday(target)!=week)await ChangeWeek(Monday(target));if(week==Monday(target)){displayDay=target;statisticsDay=target;rangeStart=null;Render();}}
+ void SetDayView(bool value){if(!ApplyEditor()||dragActive)return;displayDay=selected?.Start.Date??rangeStart?.Date??statisticsDay;if(displayDay<LoadedStart||displayDay>=LoadedUntil)displayDay=DateTime.Today>=week&&DateTime.Today<week.AddDays(7)?DateTime.Today:week;dayView=value;if(value){statisticsDay=displayDay;statisticsTabs.SelectedIndex=1;}rangeStart=null;pasteTime=null;Render();UpdateViewTools();}
+ async Task NavigateCalendar(int delta){if(customFrom.HasValue&&!dayView){int length=(customThrough.Value-customFrom.Value).Days+1;await ChangeRange(customFrom.Value.AddDays(delta*length),customThrough.Value.AddDays(delta*length),rangeDayWidth);return;}if(!dayView){await ChangeWeek(week.AddDays(delta*7));return;}var target=DisplayStart.AddDays(delta);if(target<LoadedStart||target>=LoadedUntil)await ChangeWeek(Monday(target));if(target>=LoadedStart&&target<LoadedUntil){displayDay=target;statisticsDay=target;rangeStart=null;Render();}}
  async Task NavigateToday(){await ChangeWeek(Monday(DateTime.Today));if(week==Monday(DateTime.Today)){displayDay=DateTime.Today;statisticsDay=displayDay;rangeStart=null;Render();}}
  void ViewSettingsDialog() {
   var w=new Window {Title="表示・作業ツリー",Owner=this,Width=540,SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner};var panel=new StackPanel {Margin=new Thickness(20)};w.Content=panel;
@@ -46,6 +47,7 @@ public partial class Blocks {
  }
  void DrawSelectedRange(){if(rangeVisual!=null)board.Children.Remove(rangeVisual);if(!rangeStart.HasValue||rangeStart<DisplayStart||rangeStart>=DisplayStart.AddDays(DisplayDayCount))return;rangeVisual=new Border {Width=Math.Max(1,DayWidth-4),Height=rangeMinutes/60.0*Hour,Background=new SolidColorBrush(Color.FromArgb(40,30,115,210)),BorderBrush=BrushOf("#1971C2"),BorderThickness=new Thickness(1),IsHitTestVisible=false};Canvas.SetLeft(rangeVisual,Gutter+(rangeStart.Value.Date-DisplayStart).Days*DayWidth+2);Canvas.SetTop(rangeVisual,rangeStart.Value.TimeOfDay.TotalHours*Hour);Panel.SetZIndex(rangeVisual,900);board.Children.Add(rangeVisual);}
  string[] ResolveDroppedWork(IDataObject data) {
+  var saved=DroppedInput(data);if(saved!=null)return new[]{saved.Project,saved.Activity};
   if(data.GetDataPresent("work"))return System.Text.Json.JsonSerializer.Deserialize<string[]>((string)data.GetData("work"));
   string project=null,group=null;
   if(data.GetDataPresent("project"))project=data.GetData("project") as string;
@@ -56,7 +58,7 @@ public partial class Blocks {
   var bottom=new StackPanel();DockPanel.SetDock(bottom,Dock.Bottom);panel.Children.Add(bottom);var query=new TextBox {Margin=new Thickness(4),Padding=new Thickness(5)};DockPanel.SetDock(query,Dock.Top);panel.Children.Add(query);var list=new ListBox {ItemsSource=options,SelectedIndex=0};panel.Children.Add(list);query.TextChanged+=(s,e)=>{list.ItemsSource=options.Where(a=>Matches(a,query.Text)).ToArray();list.SelectedIndex=0;};string[] result=null;
   bottom.Children.Add(ButtonOf("配置",()=>{if(list.SelectedItem is string activity){result=new[]{project,activity};w.Close();}}));bottom.Children.Add(ButtonOf("キャンセル",()=>w.Close()));w.ShowDialog();return result;
  }
- static bool IsWorkDrop(IDataObject data)=>data.GetDataPresent("work")||data.GetDataPresent("project")||data.GetDataPresent("work-group");
+ static bool IsWorkDrop(IDataObject data)=>data.GetDataPresent("saved-input")||data.GetDataPresent("work")||data.GetDataPresent("project")||data.GetDataPresent("work-group");
 }
 
 

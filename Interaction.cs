@@ -59,7 +59,7 @@ public partial class Blocks {
    else if(ctrl&&(e.Key==Key.Add||e.Key==Key.OemPlus)){e.Handled=true;SetZoom(Hour/144*100+25);}
    else if(ctrl&&(e.Key==Key.Subtract||e.Key==Key.OemMinus)){e.Handled=true;SetZoom(Hour/144*100-25);}
   };
-  calendarScroll.PreviewMouseLeftButtonDown+=(s,e)=>{if(zoomScale!=1)SetZoom(Hour/144*100*zoomScale,zoomAnchor);};
+  // Keep the visual under the pointer alive until the current gesture ends.
   calendarScroll.PreviewMouseWheel+=(s,e)=>{if(Keyboard.Modifiers.HasFlag(ModifierKeys.Control)){e.Handled=true;PreviewZoom(e.Delta,e.GetPosition(calendarScroll).Y);}};
  }
  void SetZoom(double percent,double anchor=0) {if(dragActive||!ApplyEditor())return;double minute=(calendarScroll.VerticalOffset+anchor)/(Hour*zoomScale);zoomTimer.Stop();zoomScale=1;board.LayoutTransform=Transform.Identity;Hour=144*Math.Clamp(percent,50,400)/100;board.Height=24*Hour;Render();calendarScroll.UpdateLayout();calendarScroll.ScrollToVerticalOffset(Math.Max(0,minute*Hour-anchor));settings.ZoomPercent=(int)Math.Round(Hour/144*100);SaveViewPreferences();status.Text="表示倍率 "+settings.ZoomPercent+"%";}
@@ -85,10 +85,10 @@ public partial class Blocks {
    int begin=0;if(!copy){var old=originals[i];var before=old.Copy();RestoreEntry(old,planned[i][0]);PendingQueue.Edit(state.Pending,old,before);selectedKeys.Add(EditingModel.Key(old));begin=1;}
    foreach(var part in planned[i].Skip(begin)){state.Entries.Add(part);PendingQueue.Edit(state.Pending,part,null);selectedKeys.Add(EditingModel.Key(part));}
   }
+  foreach(var input in planned.SelectMany(parts=>parts))RecordInput(input);RefreshReuse();
   selected=SelectedEntries().FirstOrDefault();if(selected!=null)statisticsDay=selected.Start.Date;if(copy||planned.Any(parts=>parts.Count>1)){selectedKeys.Clear();selected=null;selectionAnchor=null;editorDirty=false;}Save();Render();status.Text="選択実績を"+(copy?"コピー":"変更")+"しました · 重複・入力禁止時間を除外 · 保存待ち";await Task.CompletedTask;
  }
 }
-
 
 
 

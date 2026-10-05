@@ -11,7 +11,7 @@ public partial class Blocks {
  double zoomScale=1,zoomAnchor;bool zoomHooked;
  void PreviewZoom(int delta,double anchor) {
   if(dragActive||!ApplyEditor())return;
-  if(!zoomHooked){zoomHooked=true;zoomTimer.Tick+=(s,e)=>{zoomTimer.Stop();SetZoom(Hour/144*100*zoomScale,zoomAnchor);};Closed+=(s,e)=>zoomTimer.Stop();}
+  if(!zoomHooked){zoomHooked=true;zoomTimer.Tick+=(s,e)=>{if(dragActive||System.Windows.Input.Mouse.LeftButton==System.Windows.Input.MouseButtonState.Pressed)return;zoomTimer.Stop();SetZoom(Hour/144*100*zoomScale,zoomAnchor);};Closed+=(s,e)=>zoomTimer.Stop();}
   double minute=(calendarScroll.VerticalOffset+anchor)/(Hour*zoomScale);
   double percent=Math.Clamp(Hour/144*100*zoomScale*Math.Pow(1.1,delta/120.0),50,400);
   zoomScale=percent/(Hour/144*100);zoomAnchor=anchor;board.LayoutTransform=new ScaleTransform(1,zoomScale);calendarScroll.UpdateLayout();calendarScroll.ScrollToVerticalOffset(Math.Max(0,minute*Hour*zoomScale-anchor));
@@ -24,9 +24,8 @@ public partial class Blocks {
  void AddSelectedCommentTotals(StackPanel panel,List<Entry> selectedRows) {
   var entries=VisibleEntries();foreach(var group in selectedRows.GroupBy(e=>(e.Project,Comment:CommentStatistics.Key(e),Day:e.Start.Date)).Take(6)){
    var matching=entries.Where(e=>e.Project==group.Key.Project&&CommentStatistics.Key(e)==group.Key.Comment).ToList();string comment=group.Key.Comment.Length==0?"（コメントなし）":group.Key.Comment;
-   var text=Label("コメント: "+comment+"\n"+group.Key.Day.ToString("M/d")+" 合計 "+Hours(matching.Where(e=>e.Start.Date==group.Key.Day).Sum(e=>e.Minutes))+" ／ 週合計 "+Hours(matching.Sum(e=>e.Minutes)),12);text.TextTrimming=TextTrimming.CharacterEllipsis;text.ToolTip=group.Key.Project+"\n"+comment+"\n同じプロジェクト・同じコメントの実績を合計";text.Foreground=BrushOf("#1971C2");panel.Children.Add(text);
+   var text=Label("コメント: "+comment+"\n"+group.Key.Day.ToString("M/d")+" 合計 "+Hours(matching.Where(e=>e.Start.Date==group.Key.Day).Sum(e=>e.Minutes))+" ／ 週合計 "+Hours(matching.Where(e=>e.Start>=Monday(group.Key.Day)&&e.Start<Monday(group.Key.Day).AddDays(7)).Sum(e=>e.Minutes)),12);text.TextTrimming=TextTrimming.CharacterEllipsis;text.ToolTip=group.Key.Project+"\n"+comment+"\n同じプロジェクト・同じコメントの実績を合計";text.Foreground=BrushOf("#1971C2");panel.Children.Add(text);
   }
  }
 }
-
 

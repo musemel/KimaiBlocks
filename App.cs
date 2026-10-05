@@ -28,6 +28,8 @@ using System.Windows.Media;
 }
 [DataContract] public class State {
  [DataMember] public List<Entry> Entries = new List<Entry>();
+ [DataMember] public List<Entry> InputHistory = new List<Entry>();
+ [DataMember] public List<SavedInput> InputTemplates = new List<SavedInput>();
  [DataMember] public List<string> Hidden = new List<string>();
  [DataMember] public List<string> Favorites = new List<string>();
  [DataMember] public List<string> Folders = new List<string>();
@@ -42,8 +44,12 @@ using System.Windows.Media;
  [DataMember] public List<string> ExpandedNodes = new List<string>();
  [DataMember] public List<PendingChange> Pending = new List<PendingChange>();
  [DataMember(EmitDefaultValue=false)] public DateTime CachedWeek;
+ [DataMember] public DateTime? CachedFrom;
+ [DataMember] public DateTime? CachedThrough;
+ [DataMember] public double CachedDayWidth=180;
  [DataMember] public string[] CachedProjects = Array.Empty<string>();
  [OnDeserialized] void Upgrade(StreamingContext context) {
+  InputHistory ??= new List<Entry>();InputTemplates ??= new List<SavedInput>();
   FixedColors ??= new Dictionary<string,string>();
   AutoColors ??= new Dictionary<string,string>();
   FolderParents ??= new Dictionary<string,string>();FolderLabels ??= new Dictionary<string,string>();FolderWorks ??= new Dictionary<string,List<WorkLink>>();FavoriteFolders ??= new List<string>();ExpandedNodes ??= new List<string>();
@@ -105,9 +111,9 @@ public partial class Blocks : Window {
   var nav=new StackPanel { Orientation=Orientation.Horizontal }; nav.Children.Add(ButtonOf("‹",async()=>await NavigateCalendar(-1))); nav.Children.Add(ButtonOf("今日",async()=>await NavigateToday())); nav.Children.Add(ButtonOf("›",async()=>await NavigateCalendar(1))); period.FontSize=19; period.Margin=new Thickness(14,0,14,0); period.VerticalAlignment=VerticalAlignment.Center; var weekButton=ButtonOf("",SelectWeek);weekButton.Content=period;weekButton.Padding=new Thickness(0,4,0,4);weekButton.ToolTip="カレンダーで表示週を選択";nav.Children.Add(weekButton); toolbar.Children.Add(nav);
 
   total.HorizontalAlignment=HorizontalAlignment.Right; total.VerticalAlignment=VerticalAlignment.Center; toolbar.Children.Add(total);
-  headers.Height=52; headers.Background=Brushes.White; DockPanel.SetDock(headers,Dock.Top); main.Children.Add(headers);
-  var scroll=new ScrollViewer { Content=board, VerticalScrollBarVisibility=ScrollBarVisibility.Auto, HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled, Background=Brushes.White }; main.Children.Add(scroll); calendarScroll=scroll;
-  board.Height=24*Hour; board.AllowDrop=true; board.SizeChanged+=(s,e)=>{if(!busy)Render();}; board.Drop+=DropWork;
+  headers.Height=52; headers.Background=Brushes.White; headerScroll=new ScrollViewer {Content=headers,HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled};DockPanel.SetDock(headerScroll,Dock.Top);main.Children.Add(headerScroll);
+  var scroll=new ScrollViewer { Content=board, VerticalScrollBarVisibility=ScrollBarVisibility.Auto, HorizontalScrollBarVisibility=ScrollBarVisibility.Auto, Background=Brushes.White }; main.Children.Add(scroll); calendarScroll=scroll;scroll.ScrollChanged+=(s,e)=>{headerScroll.ScrollToHorizontalOffset(scroll.HorizontalOffset);if(e.ViewportWidthChange!=0)UpdateCalendarWidth();};
+  board.Height=24*Hour; board.AllowDrop=true; board.SizeChanged+=(s,e)=>{if(!busy&&!dragActive)Render();}; board.Drop+=DropWork;
   board.DragOver+=(s,e)=>{e.Effects=IsWorkDrop(e.Data)?DragDropEffects.Copy:DragDropEffects.None;e.Handled=true;};
   board.Focusable=true;
   SetupRangeSelection();
@@ -123,22 +129,22 @@ public partial class Blocks : Window {
  void Save() { try { Persist(); } catch(Exception ex) { status.Text="キャッシュ保存失敗: "+SafeError(ex);if(state.Pending.Count>0)OfferDiscard(status.Text);else MessageBox.Show(this,status.Text,"保存失敗"); } }
  void Persist() {
   if(file==null)return;
-  state.CachedWeek=week;state.CachedProjects=Projects;
+  state.CachedWeek=week;state.CachedProjects=Projects;state.CachedFrom=customFrom;state.CachedThrough=customThrough;state.CachedDayWidth=rangeDayWidth;
   Directory.CreateDirectory(Path.GetDirectoryName(file));string temp=file+".tmp";
   using(var f=File.Create(temp))new DataContractJsonSerializer(typeof(State)).WriteObject(f,state);
   if(File.Exists(file))File.Replace(temp,file,file+".bak");else File.Move(temp,file);
  }
  bool dayView;DateTime displayDay;
- DateTime DisplayStart=>dayView?(displayDay>=week&&displayDay<week.AddDays(7)?displayDay:week):week;
- int DisplayDayCount=>dayView?1:settings.ShowWeekends?7:5;
+ DateTime DisplayStart=>dayView?(displayDay>=LoadedStart&&displayDay<LoadedUntil?displayDay:LoadedStart):customFrom??week;
+ int DisplayDayCount=>dayView?1:customFrom.HasValue?(customThrough.Value-customFrom.Value).Days+1:settings.ShowWeekends?7:5;
  double DayWidth {get{return Math.Max(1,(board.ActualWidth-Gutter)/DisplayDayCount);}}
  void Render() {
-  if(busy||inlineComment!=null)return; busy=true;
+  if(busy||dragActive||inlineComment!=null)return; busy=true;
   try {
-   RefreshColors();entryBoxes.Clear();
+   UpdateCalendarWidth();RefreshColors();entryBoxes.Clear();
    board.Children.Clear(); headers.Children.Clear(); headers.ColumnDefinitions.Clear();headers.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(Gutter)});
-   period.Text=dayView?DisplayStart.ToString("yyyy/M/d (ddd)"):week.ToString("yyyy/M/d")+" – "+week.AddDays(6).ToString("M/d");
-   var entries=VisibleEntries();RenderStatistics(entries);total.Text="週合計  "+(entries.Sum(x=>x.Minutes)/60.0).ToString("0.##")+" h  ·  5分刻み";
+   period.Text=dayView?DisplayStart.ToString("yyyy/M/d (ddd)"):(customFrom??week).ToString("yyyy/M/d")+" – "+(customThrough??week.AddDays(6)).ToString("M/d");
+   var entries=VisibleEntries();RenderStatistics(entries);total.Text=(customFrom.HasValue?"期間合計  ":"週合計  ")+(entries.Where(x=>!customFrom.HasValue||x.Start>=customFrom.Value&&x.Start<customThrough.Value.AddDays(1)).Sum(x=>x.Minutes)/60.0).ToString("0.##")+" h  ·  5分刻み";
    DrawUnavailable();
    for(int d=0;d<DisplayDayCount;d++) {headers.ColumnDefinitions.Add(new ColumnDefinition());var h=Label(DisplayStart.AddDays(d).ToString("M/d (ddd)"),14);h.HorizontalAlignment=HorizontalAlignment.Center;if(DisplayStart.AddDays(d)==DateTime.Today)h.Foreground=BrushOf("#1971C2");DateTime headerDay=DisplayStart.AddDays(d);h.Cursor=Cursors.Hand;h.ToolTip="この日の統計を表示";h.MouseLeftButtonDown+=(s,e)=>{statisticsDay=headerDay;SetStatisticsVisible(true);statisticsTabs.SelectedIndex=1;RenderStatistics(VisibleEntries());};Grid.SetColumn(h,d+1);headers.Children.Add(h);var line=new Border{Width=1,Height=board.Height,Background=BrushOf("#E8EDF2")};Canvas.SetLeft(line,Gutter+d*DayWidth);board.Children.Add(line);}
    for(int h=0;h<24;h++) {var line=new Border {Height=1,Width=DisplayDayCount*DayWidth,Background=BrushOf("#E8EDF2")};Canvas.SetLeft(line,Gutter);Canvas.SetTop(line,h*Hour);board.Children.Add(line);}
@@ -153,6 +159,7 @@ public partial class Blocks : Window {
   var work=ResolveDroppedWork(e.Data);if(work==null)return;e.Handled=true;
   int d=Math.Clamp((int)((pos.X-Gutter)/DayWidth),0,DisplayDayCount-1);int minute=Math.Clamp(Snap(pos.Y/Hour*60),0,1435);
   var en=new Entry {Project=work[0],Activity=work[1],Start=rangeStart??DisplayStart.AddDays(d).AddMinutes(minute),Minutes=rangeStart.HasValue?rangeMinutes:Math.Min(60,1440-minute)};
+  var reusable=DroppedInput(e.Data);if(reusable!=null){en.Note=reusable.Note;en.Minutes=rangeStart.HasValue?rangeMinutes:Math.Min(reusable.Minutes,1440-minute);}
   if(!AssignIds(en))return;await FinishBlockDrag(null,null,en,true,0);rangeStart=null;Render();
  }
  async void Delete(Entry en) {await DeleteEntry(en);}
@@ -165,7 +172,6 @@ public partial class Blocks : Window {
   panel.Children.Add(ButtonOf("保存",async()=>{TimeSpan t;int m;if(project.SelectedItem==null||activity.SelectedItem==null||!date.SelectedDate.HasValue||!TimeSpan.TryParse(start.Text,out t)||!int.TryParse(minutes.Text,out m)||!ValidTime(t,m)){MessageBox.Show(w,"時刻と時間は5分単位で、終了は当日24:00までに設定してください。");return;}var desired=en.Copy();desired.Project=(string)project.SelectedItem;desired.Activity=(string)activity.SelectedItem;desired.Start=date.SelectedDate.Value.Date+t;desired.Minutes=m;desired.Note=note.Text;if(!AssignIds(desired))return;RestoreEntry(en,desired);w.Close();await CommitEntry(en,before);}));w.Loaded+=(s,e)=>{note.Focus();note.SelectAll();};w.ShowDialog();
  }
 }
-
 
 
 

@@ -39,7 +39,7 @@ public partial class Blocks {
   var hint=Label("右クリックでフォルダ追加・削除\nプロジェクトをフォルダへドラッグ",11);hint.Foreground=BrushOf("#63758A");filters.Children.Add(hint);
   VirtualizingPanel.SetIsVirtualizing(tree,true);VirtualizingPanel.SetVirtualizationMode(tree,VirtualizationMode.Recycling);ScrollViewer.SetCanContentScroll(tree,true);
   tree.BorderThickness=new Thickness(0);tree.Margin=new Thickness(4);tree.Background=Brushes.White;
-  ApplyTreeGuides();left.Children.Add(tree);
+  ApplyTreeGuides();BuildReuseTabs(left,filters);
  }
  void ShowProjectChoices() {
   var w=new Window {Title="表示プロジェクト",Owner=this,Width=540,Height=660,WindowStartupLocation=WindowStartupLocation.CenterOwner};
@@ -48,7 +48,7 @@ public partial class Blocks {
   choices.Children.Add(Label("表示プロジェクト",17));
   projectSearch.Padding=new Thickness(7);projectSearch.Margin=new Thickness(3);projectSearch.ToolTip="表示対象をプロジェクト名で検索";
   choices.Children.Add(Label("プロジェクト名で検索",11));choices.Children.Add(projectSearch);
-  choices.Children.Add(ButtonOf("すべてのチェックを外す",()=>{foreach(var p in Projects)if(!state.Hidden.Contains(p))state.Hidden.Add(p);Save();PopulateProjectList();Populate();}));
+  choices.Children.Add(ButtonOf("すべてのチェックを外す",()=>{foreach(var p in Projects)if(!state.Hidden.Contains(p))state.Hidden.Add(p);Save();PopulateProjectList();Populate();Render();}));
   projectList.Height=420;projectList.Margin=new Thickness(3);projectList.BorderBrush=BrushOf("#E2E8F0");
   ScrollViewer.SetHorizontalScrollBarVisibility(projectList,ScrollBarVisibility.Disabled);
   VirtualizingPanel.SetIsVirtualizing(projectList,true);VirtualizingPanel.SetVirtualizationMode(projectList,VirtualizationMode.Recycling);
@@ -61,9 +61,9 @@ public partial class Blocks {
   PopulateProjectList();choices.Children.Add(ButtonOf("閉じる",()=>w.Close()));w.ShowDialog();
  }
  void PopulateProjectList() {
-  projectList.ItemsSource=Projects.Where(p=>Matches(p,projectSearch.Text)).Select(p=>new ProjectChoice(p,()=>!state.Hidden.Contains(p),enabled=>{
+  projectList.ItemsSource=Projects.Where(p=>Matches(p,projectSearch.Text)).OrderBy(p=>state.Hidden.Contains(p)).ThenBy(p=>p,StringComparer.CurrentCultureIgnoreCase).Select(p=>new ProjectChoice(p,()=>!state.Hidden.Contains(p),enabled=>{
    if(enabled)state.Hidden.Remove(p);else if(!state.Hidden.Contains(p))state.Hidden.Add(p);
-   Save();Populate();Render();
+   Save();Populate();Render();Dispatcher.BeginInvoke(new Action(PopulateProjectList));
   })).ToList();
  }
  static bool Matches(string value,string query) {string Clean(string s)=>new string((s??" ").Normalize(NormalizationForm.FormKC).Where(c=>!char.IsWhiteSpace(c)).ToArray());return System.Globalization.CultureInfo.GetCultureInfo("ja-JP").CompareInfo.IndexOf(Clean(value),Clean(query),System.Globalization.CompareOptions.IgnoreCase|System.Globalization.CompareOptions.IgnoreKanaType|System.Globalization.CompareOptions.IgnoreWidth)>=0;}
@@ -80,9 +80,9 @@ public partial class Blocks {
  }
  TreeViewItem Node(string title,string key,bool root) {
   var header=Label(title,12);header.Padding=new Thickness(2,3,2,3);header.ToolTip=title;
-  var node=new TreeViewItem {Header=header,IsExpanded=(root?!state.Collapsed.Contains(key):state.ExpandedNodes.Contains(key))||!string.IsNullOrWhiteSpace(search.Text)||favorites.IsChecked==true};
-  node.Expanded+=(s,e)=>{if(e.OriginalSource!=node)return;if(!rebuildingTree&&string.IsNullOrWhiteSpace(search.Text)&&favorites.IsChecked!=true){state.Collapsed.Remove(key);if(!state.ExpandedNodes.Contains(key))state.ExpandedNodes.Add(key);Save();}};
-  node.Collapsed+=(s,e)=>{if(e.OriginalSource!=node)return;if(!rebuildingTree&&string.IsNullOrWhiteSpace(search.Text)&&favorites.IsChecked!=true){state.ExpandedNodes.Remove(key);if(!state.Collapsed.Contains(key))state.Collapsed.Add(key);Save();}};
+  var node=new TreeViewItem {Header=header,IsExpanded=(root?!state.Collapsed.Contains(key):state.ExpandedNodes.Contains(key))||!string.IsNullOrWhiteSpace(search.Text)};
+  node.Expanded+=(s,e)=>{if(e.OriginalSource!=node)return;if(!rebuildingTree&&string.IsNullOrWhiteSpace(search.Text)){state.Collapsed.Remove(key);if(!state.ExpandedNodes.Contains(key))state.ExpandedNodes.Add(key);Save();}};
+  node.Collapsed+=(s,e)=>{if(e.OriginalSource!=node)return;if(!rebuildingTree&&string.IsNullOrWhiteSpace(search.Text)){state.ExpandedNodes.Remove(key);if(!state.Collapsed.Contains(key))state.Collapsed.Add(key);Save();}};
   header.MouseRightButtonDown+=(s,e)=>node.IsSelected=true;
   node.ContextMenuOpening+=(s,e)=>{if(node.ContextMenu!=null)return;var source=e.OriginalSource as DependencyObject;while(source!=null&&source is not TreeViewItem)source=source is Visual?VisualTreeHelper.GetParent(source):LogicalTreeHelper.GetParent(source);if(ReferenceEquals(source,node))e.Handled=true;};
   return node;

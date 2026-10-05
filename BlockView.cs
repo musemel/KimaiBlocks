@@ -23,8 +23,11 @@ public partial class Blocks {
   Point origin=new Point();bool moved=false,copy=false;int mode=0;List<Entry> originals=null,desired=null;var ghosts=new List<Border>();
   void ClearGhosts(){foreach(var ghost in ghosts)board.Children.Remove(ghost);ghosts.Clear();if(originals!=null)foreach(var row in originals)if(entryBoxes.TryGetValue(row,out var visual))visual.Opacity=1;}
   box.MouseLeftButtonDown+=(s,e)=>{
-   e.Handled=true;if(!SelectEntry(en,Keyboard.Modifiers))return;board.Focus();if(e.ClickCount==2){Edit(en);return;}
-   if(en.ReadOnlyReason!=null||!CanEdit(en))return;origin=e.GetPosition(board);copy=Keyboard.Modifiers.HasFlag(ModifierKeys.Control);mode=HitMode(e.GetPosition(box).Y,box.Height);moved=false;originals=null;box.CaptureMouse();dragActive=true;
+   e.Handled=true;origin=e.GetPosition(board);mode=HitMode(e.GetPosition(box).Y,box.Height);dragActive=true;
+   if(!SelectEntry(en,Keyboard.Modifiers)){dragActive=false;return;}board.Focus();
+   if(e.ClickCount==2){dragActive=false;Edit(en);return;}
+   if(en.ReadOnlyReason!=null||!CanEdit(en)){dragActive=false;return;}
+   copy=Keyboard.Modifiers.HasFlag(ModifierKeys.Control);moved=false;originals=null;dragActive=box.CaptureMouse();
   };
   box.MouseMove+=(s,e)=>{
    box.Cursor=HitMode(e.GetPosition(box).Y,box.Height)!=0?Cursors.SizeNS:Cursors.SizeAll;
@@ -38,12 +41,12 @@ public partial class Blocks {
   box.MouseLeftButtonUp+=async(s,e)=>{if(!box.IsMouseCaptured)return;e.Handled=true;dragActive=false;box.ReleaseMouseCapture();ClearGhosts();if(moved&&desired!=null){if(desired.Any(d=>d.Start<DisplayStart||d.Start.AddMinutes(d.Minutes)>DisplayStart.AddDays(DisplayDayCount)||d.Start.Date!=d.Start.AddMinutes(d.Minutes).AddTicks(-1).Date)){status.Text="表示範囲内・同日内に収めてください。";Render();return;}await ApplyBatchDrag(originals,desired,copy);}else {if(!Keyboard.Modifiers.HasFlag(ModifierKeys.Control)&&!Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)){selectedKeys.Clear();selectedKeys.Add(EditingModel.Key(en));selected=en;}RefreshSelection();}};
   box.LostMouseCapture+=(s,e)=>{if(dragActive){dragActive=false;ClearGhosts();Render();}};
   box.DragOver+=(s,e)=>{if(IsWorkDrop(e.Data)){e.Effects=DragDropEffects.Copy;e.Handled=true;}};
-  box.Drop+=async(s,e)=>{if(!IsWorkDrop(e.Data))return;if(rangeStart.HasValue){DropWork(s,e);return;}e.Handled=true;if(!ApplyEditor()||!CanEdit(en))return;var work=ResolveDroppedWork(e.Data);if(work==null)return;var replacement=en.Copy();replacement.Project=work[0];replacement.Activity=work[1];if(!AssignIds(replacement))return;var before=en.Copy();RestoreEntry(en,replacement);await CommitEntry(en,before);};
+  box.Drop+=async(s,e)=>{if(!IsWorkDrop(e.Data))return;if(rangeStart.HasValue){DropWork(s,e);return;}e.Handled=true;if(!ApplyEditor()||!CanEdit(en))return;var work=ResolveDroppedWork(e.Data);if(work==null)return;var replacement=en.Copy();replacement.Project=work[0];replacement.Activity=work[1];var reusable=DroppedInput(e.Data);if(reusable!=null)replacement.Note=reusable.Note;if(!AssignIds(replacement))return;var before=en.Copy();RestoreEntry(en,replacement);await CommitEntry(en,before);};
   var menu=new ContextMenu();var edit=new MenuItem {Header="編集（Enter）"};edit.Click+=(s,e)=>Edit(en);menu.Items.Add(edit);var comment=new MenuItem {Header="コメント編集（F2）"};comment.Click+=(s,e)=>BeginInlineComment(en);menu.Items.Add(comment);var del=new MenuItem {Header="削除（Delete）"};del.Click+=async(s,e)=>await DeleteEntry(en);menu.Items.Add(del);box.ContextMenu=menu;
+  var template=new MenuItem {Header="定型入力に登録…"};template.Click+=(s,e)=>{if(ApplyEditor())SaveTemplate(en);};menu.Items.Insert(2,template);
  }
  static Brush ReadableText(string hex){var c=(Color)ColorConverter.ConvertFromString(hex);return .2126*c.R+.7152*c.G+.0722*c.B<140?Brushes.White:Brushes.Black;}
 }
-
 
 
 

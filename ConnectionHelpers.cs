@@ -22,13 +22,12 @@ public partial class Blocks {
   foreach(var en in state.Entries) {
    if(service!=null&&(service.Projects.Any(p=>p.Id==en.ProjectId&&p.Visible==false)||service.Activities.Any(a=>a.Id==en.ActivityId&&a.Visible==false)))continue;
    DateTime end=en.Start.AddMinutes(en.Minutes);
-   if(end<=week||en.Start>=week.AddDays(7))continue;
+   if(end<=LoadedStart||en.Start>=LoadedUntil)continue;
    if(en.Start.Date==end.AddTicks(-1).Date){result.Add(en);continue;}
-   for(var day=en.Start.Date<week?week:en.Start.Date;day<end&&day<week.AddDays(7);day=day.AddDays(1)) {
+   for(var day=en.Start.Date<LoadedStart?LoadedStart:en.Start.Date;day<end&&day<LoadedUntil;day=day.AddDays(1)) {
     var slice=en.Copy();slice.Start=en.Start>day?en.Start:day;DateTime until=end<day.AddDays(1)?end:day.AddDays(1);slice.Minutes=(int)Math.Ceiling((until-slice.Start).TotalMinutes);slice.ReadOnlyReason="日をまたぐ実績";result.Add(slice);
    }
   }
   return result;
  }
 }
-

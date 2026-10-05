@@ -37,7 +37,7 @@ public partial class Blocks {
   if(inlineComment!=null&&!finishingInline)return FinishInline(true);
   if(!editorDirty)return true;var rows=SelectedEntries();if(rows.Count==0)return true;
   if(rows.Any(e=>!CanEdit(e)))return false;
-  if(rows.Count>1){Remember();foreach(var en in rows){var old=en.Copy();en.Note=editorComment.Text;PendingQueue.Edit(state.Pending,en,old);}editorDirty=false;Save();Render();return true;}
+  if(rows.Count>1){Remember();foreach(var en in rows){var old=en.Copy();en.Note=editorComment.Text;PendingQueue.Edit(state.Pending,en,old);RecordInput(en);}RefreshReuse();editorDirty=false;Save();Render();return true;}
   var entry=rows[0];
   if(editorProject.SelectedItem==null||editorActivity.SelectedItem==null||!editorDate.SelectedDate.HasValue||!TimeSpan.TryParse(editorStart.Text,out var time)||!int.TryParse(editorMinutes.Text,out var minutes)||!ValidTime(time,minutes)){MessageBox.Show(this,"プロジェクト・作業・日付・5分単位の時刻と時間を確認してください。");return false;}
   var desired=entry.Copy();desired.Project=(string)editorProject.SelectedItem;desired.Activity=(string)editorActivity.SelectedItem;desired.Start=editorDate.SelectedDate.Value.Date+time;desired.Minutes=minutes;desired.Note=editorComment.Text;if(!AssignIds(desired))return false;
@@ -57,7 +57,6 @@ public partial class Blocks {
   finally {finishingInline=false;}
  }
 }
-
 
 
 

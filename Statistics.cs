@@ -32,7 +32,8 @@ public partial class Blocks {
   if(statisticsTabs==null)return;
   statisticsPanel.Visibility=settings.ShowStatistics?Visibility.Visible:Visibility.Collapsed;if(rightGrip!=null)rightGrip.Visibility=statisticsPanel.Visibility;
   if(!settings.ShowStatistics)return;
-  if(statisticsDay<week||statisticsDay>=week.AddDays(7))statisticsDay=DateTime.Today>=week&&DateTime.Today<week.AddDays(7)?DateTime.Today:week;
+  if(statisticsDay<LoadedStart||statisticsDay>=LoadedUntil)statisticsDay=DateTime.Today>=LoadedStart&&DateTime.Today<LoadedUntil?DateTime.Today:LoadedStart;
+  DateTime week=StatisticsWeek;entries=entries.Where(e=>e.Start>=week&&e.Start<week.AddDays(7)).ToList();
   weekStatistics.Children.Clear();dayStatistics.Children.Clear();
   weekStatistics.Children.Add(Label(week.ToString("M/d")+" – "+week.AddDays(6).ToString("M/d"),13));
   AddTotal(weekStatistics,entries);
@@ -45,8 +46,8 @@ public partial class Blocks {
    weekStatistics.Children.Add(new ProgressBar {Minimum=0,Maximum=maximum,Value=minutes,Height=3,Foreground=BrushOf("#4F92CA"),Background=BrushOf("#EDF2F7"),Margin=new Thickness(4,0,4,3)});
   }
 
-  var dayPicker=new ComboBox {Margin=new Thickness(4,6,4,8),Padding=new Thickness(6),ItemsSource=Enumerable.Range(0,7).Select(d=>week.AddDays(d).ToString("M/d (ddd)")).ToArray(),SelectedIndex=(statisticsDay-week).Days};
-  dayPicker.SelectionChanged+=(s,e)=>{if(dayPicker.SelectedIndex<0)return;statisticsDay=week.AddDays(dayPicker.SelectedIndex);RenderStatistics(VisibleEntries());};
+  var dayPicker=new ComboBox {Margin=new Thickness(4,6,4,8),Padding=new Thickness(6),ItemsSource=Enumerable.Range(0,(LoadedUntil-LoadedStart).Days).Select(d=>LoadedStart.AddDays(d).ToString("M/d (ddd)")).ToArray(),SelectedIndex=(statisticsDay-LoadedStart).Days};
+  dayPicker.SelectionChanged+=(s,e)=>{if(dayPicker.SelectedIndex<0)return;statisticsDay=LoadedStart.AddDays(dayPicker.SelectedIndex);RenderStatistics(VisibleEntries());};
   dayStatistics.Children.Add(Label("日集計",16));dayStatistics.Children.Add(dayPicker);
   var dayEntries=entries.Where(e=>e.Start.Date==statisticsDay).ToList();AddTotal(dayStatistics,dayEntries);
   AddDailyBreakdown(dayEntries);

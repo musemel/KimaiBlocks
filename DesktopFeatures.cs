@@ -53,9 +53,16 @@ public partial class Blocks {
    var result=await read;
    if(!IsVisible)return;
    if(result.Error!=null){if(manual)MessageBox.Show(this,result.Error,"アップデート");return;}
-   if(result.Version>Version.Parse(AppVersion)){MessageBox.Show(this,"新しいバージョンがあります: "+result.Version+"\n現在: "+AppVersion+"\n配布フォルダ: "+folder+"\n保存して終了後、配布フォルダの一式をコピーして更新してください。\n管理設定がある場合はsettings.policy.jsonも一緒にコピーしてください。","アップデートのお知らせ");}
-   else if(manual)MessageBox.Show(this,"確認先に新しいバージョンはありません。現在: "+AppVersion,"アップデート");
+   if(result.Version>Version.Parse(AppVersion)||manual)ShowUpdateDialog(folder,result.Version);
   }finally {checkingUpdates=false;}
+ }
+ void ShowUpdateDialog(string folder,Version available) {
+  var w=new Window {Title="アップデート",Owner=this,Width=550,SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner};
+  var panel=new StackPanel {Margin=new Thickness(20)};w.Content=panel;
+  var message=Label((available>Version.Parse(AppVersion)?"新しいバージョンがあります":"新しいバージョンはありません")+"\n現在: "+AppVersion+"\n配布版: "+available+"\n\n保存して終了後、配布フォルダの一式をコピーしてください。\nsettings.policy.json がある場合は一緒にコピーしてください。",13);message.TextWrapping=TextWrapping.Wrap;panel.Children.Add(message);
+  panel.Children.Add(new TextBox {Text=folder,IsReadOnly=true,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(4,12,4,8)});
+  panel.Children.Add(ButtonOf("配布フォルダを開く",()=>{try{if(!Directory.Exists(folder))throw new IOException("配布フォルダにアクセスできません。");Process.Start(new ProcessStartInfo {FileName=Path.GetFullPath(folder),UseShellExecute=true});}catch(Exception ex){MessageBox.Show(w,SafeError(ex),"フォルダを開けません");}}));
+  panel.Children.Add(ButtonOf("閉じる",()=>w.Close()));w.ShowDialog();
  }
  // Restore only unsaved local changes. Requests already accepted by Kimai are never undone here.
  internal static void RollbackPending(State data) {
@@ -84,7 +91,7 @@ public partial class Blocks {
    candidate=new KimaiService(settings.Url,PortableToken.Read(settings.ProtectedToken,DataDirectory),settings.Username,settings.Legacy,allowHttp:settings.AllowHttp);await candidate.InitializeAsync();
    string target=AccountFile(candidate.BaseUrl,candidate.Me.Id.Value);
    if(file!=null&&file!=target)throw new KimaiFailure("接続ユーザーが変わっています。設定からアカウントを切り替えてください。");
-   var entries=await candidate.ReadWeekAsync(week);
+   var entries=await candidate.ReadRangeAsync(LoadedStart,LoadedUntil);
    state.Entries=entries;state.Pending=new System.Collections.Generic.List<PendingChange>();file=target;
    var previous=service;service=candidate;candidate=null;
    try {await RefreshView();Persist();committed=true;}catch {candidate=service;service=previous;throw;}
@@ -93,7 +100,6 @@ public partial class Blocks {
   finally {candidate?.Dispose();EndProgress();Populate();PopulateProjectList();Render();}
  }
 }
-
 
 
 

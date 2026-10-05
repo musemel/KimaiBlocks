@@ -57,6 +57,8 @@ public static class KimaiServiceTests {
    api.Projects[0].GlobalActivities=null;Check(api.ForProject(11).All(a=>a.Project==11),"Unknown global flag must not expose globals");api.Projects[0].GlobalActivities=true;
    var week=new DateTime(2026,9,21);var entries=await api.ReadWeekAsync(week);var original=entries.Single();Check(original.Start.Hour==9&&original.Start.Minute==5&&original.Minutes==5,"Timezone conversion changed wall time");
    Check(mock.Queries.Last().Contains("user=7")&&mock.Queries.Last().Contains("begin="),"Own-week filtering missing");
+   await api.ReadRangeAsync(week,week.AddDays(42));var rangeQuery=Uri.UnescapeDataString(mock.Queries.Last());Check(rangeQuery.Contains("end=2026-11-01T23:59:59")&&rangeQuery.Contains("user=7"),"Range query boundary/owner");
+   int rangeCalls=mock.Methods.Count;foreach(var rangeEnd in new[]{week,week.AddDays(-1),week.AddDays(43)}){bool blocked=false;try{await api.ReadRangeAsync(week,rangeEnd);}catch(ArgumentException){blocked=true;}Check(blocked,"Invalid range accepted");}Check(mock.Methods.Count==rangeCalls,"Invalid range sent to server");
    var edited=original.Copy();edited.Start=edited.Start.AddMinutes(5);edited.Note="updated";
    var saved=await api.WriteAsync(edited,original);using(var json=JsonDocument.Parse(mock.LastBody)){var r=json.RootElement;Check(r.GetProperty("begin").GetString()=="2026-09-21T09:10:00","Write contains timezone offset");Check(r.GetProperty("end").GetString()=="2026-09-21T09:15:00","Five minute duration changed");Check(!r.TryGetProperty("tags",out _)&&!r.TryGetProperty("hourlyRate",out _)&&!r.TryGetProperty("fixedRate",out _)&&!r.TryGetProperty("billable",out _)&&!r.TryGetProperty("exported",out _),"Unchanged or privileged fields sent");}
    Check(saved.RemoteId==41&&saved.Note=="updated","PATCH response mapping");Check(JsonNode.Parse(mock.Record)["hourlyRate"].GetValue<int>()==125&&JsonNode.Parse(mock.Record)["tags"][0].GetValue<string>()=="keep"&&saved.Billable,"Metadata was not preserved");
@@ -90,5 +92,4 @@ public static class KimaiServiceTests {
   using(var legacy=new KimaiService("https://kimai.test/kimai","test-only-token","test",true,new MockKimai {Legacy=true})){await legacy.InitializeAsync();}
  }
 }
-
 

@@ -133,11 +133,13 @@ public sealed partial class KimaiService : IDisposable {
   if(p==null||p.Visible==false)return Array.Empty<ActivityCollection>();
   return Activities.Where(a=>a.Visible!=false && (a.Project==id || ((!a.Project.HasValue||a.Project==0)&&p?.GlobalActivities==true)));
  }
- public async Task<List<Entry>> ReadWeekAsync(DateTime week) {
+ public Task<List<Entry>> ReadWeekAsync(DateTime week)=>ReadRangeAsync(week,week.AddDays(7));
+ public async Task<List<Entry>> ReadRangeAsync(DateTime from,DateTime until) {
+  if(from!=from.Date||until!=until.Date||until<=from||(until-from).TotalDays>42)throw new ArgumentException("実績の取得範囲は1〜42日で指定してください。");
   var entries=new Dictionary<int,Entry>();
   for(int page=1;page<=1000;page++) {
    int current=page;
-   var batch=await client.Api.Timesheets.GetAsync(c=>{c.QueryParameters.User=Me.Id.Value.ToString(CultureInfo.InvariantCulture);c.QueryParameters.Begin=LocalDate(week);c.QueryParameters.End=LocalDate(week.AddDays(7).AddSeconds(-1));c.QueryParameters.Page=current.ToString();c.QueryParameters.Size="100";c.QueryParameters.OrderBy="id";c.QueryParameters.Order="ASC";c.QueryParameters.Full="false";})??new List<TimesheetCollection>();
+   var batch=await client.Api.Timesheets.GetAsync(c=>{c.QueryParameters.User=Me.Id.Value.ToString(CultureInfo.InvariantCulture);c.QueryParameters.Begin=LocalDate(from);c.QueryParameters.End=LocalDate(until.AddSeconds(-1));c.QueryParameters.Page=current.ToString();c.QueryParameters.Size="100";c.QueryParameters.OrderBy="id";c.QueryParameters.Order="ASC";c.QueryParameters.Full="false";})??new List<TimesheetCollection>();
    int before=entries.Count;
    foreach(var t in batch) {if(t.User!=Me.Id)throw new KimaiFailure("ユーザーの異なる実績が返されました。読み込みを中止しました。");if(t.Id.HasValue)entries[t.Id.Value]=Map(t.Id,t.Project,t.Activity,t.Begin,t.End,t.Description,t.Billable,t.Exported,t.Break,t.Tags);}
    if(guard.TotalPages.HasValue?page>=guard.TotalPages.Value:batch.Count<100)break;if(entries.Count==before)throw new KimaiFailure("実績のページ取得が進みませんでした。");if(page==1000)throw new KimaiFailure("実績の取得上限に達しました。");
@@ -188,4 +190,3 @@ public sealed partial class KimaiService : IDisposable {
  }
  public void Dispose() {adapter.Dispose();http.Dispose();}
 }
-

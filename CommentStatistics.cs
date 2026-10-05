@@ -14,7 +14,7 @@ public static class CommentStatistics {
 }
 public partial class Blocks {
  void ShowDetailedStatistics() {
-  if(communicating)return;
+  if(communicating)return;DateTime week=StatisticsWeek;
   var w=new Window {Title="コメント別の詳細集計",Owner=this,Width=880,Height=720,MinWidth=560,MinHeight=400,WindowStartupLocation=WindowStartupLocation.CenterOwner};
   var root=new DockPanel {Margin=new Thickness(18)};w.Content=root;
   var top=new StackPanel();DockPanel.SetDock(top,Dock.Top);root.Children.Add(top);
@@ -41,7 +41,7 @@ public partial class Blocks {
    }
   }
   void Refresh() {
-   day.IsEnabled=scope.SelectedIndex==1;var entries=VisibleEntries();if(scope.SelectedIndex==1)entries=entries.Where(e=>e.Start.Date==week.AddDays(Math.Max(0,day.SelectedIndex))).ToList();
+   day.IsEnabled=scope.SelectedIndex==1;var entries=VisibleEntries().Where(e=>e.Start>=week&&e.Start<week.AddDays(7)).ToList();if(scope.SelectedIndex==1)entries=entries.Where(e=>e.Start.Date==week.AddDays(Math.Max(0,day.SelectedIndex))).ToList();
    totalLabel.Text="合計 "+Hours(entries.Sum(e=>e.Minutes))+"  ·  "+entries.Count+"ブロック";tree.Items.Clear();
    foreach(var group in entries.GroupBy(e=>e.Project).OrderByDescending(g=>g.Sum(e=>e.Minutes))){var rows=group.ToList();tree.Items.Add(Node(group.Key??"未設定",rows,()=>CommentsIn(rows)));}
    if(entries.Count==0)tree.Items.Add(new TreeViewItem {Header="実績なし"});
@@ -49,4 +49,3 @@ public partial class Blocks {
   scope.SelectionChanged+=(s,e)=>Refresh();day.SelectionChanged+=(s,e)=>Refresh();Refresh();w.ShowDialog();
  }
 }
-

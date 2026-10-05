@@ -18,7 +18,7 @@ public partial class Blocks {
     if(Projects.Any(p=>!window.state.Hidden.Contains(p)))throw new Exception("Initial project selection must be empty");
     window.state.Hidden.Remove(Projects[0]);await window.RefreshView();
     if(window.state.Hidden.Contains(Projects[0]))throw new Exception("Existing selection was reset");
-    int notices=0;window.testError=text=>notices++;
+    int notices=0;window.testError=text=>{notices++;Console.WriteLine("Expected error path: "+text);};
     Entry NewEntry()=>new Entry {ProjectId=11,ActivityId=22,Project=window.service.ProjectName(11),Activity=window.service.ActivityName(22),Start=new DateTime(2026,9,21,9,5,0),Minutes=5,Billable=true};
     var entry=NewEntry();window.state.Entries.Add(entry);await window.CommitEntry(entry,null);
     var before=entry.Copy();entry.Minutes=10;await window.CommitEntry(entry,before);
@@ -42,7 +42,7 @@ public partial class Blocks {
     window.Close();await WaitUntil(()=>window.closingApproved&&!window.IsVisible);
     if(window.IsVisible||window.state.Pending.Count!=0)throw new Exception("Successful close did not save");
     Projects=new[]{"A","B","C","D"};var empty=new Blocks(true);empty.Show();empty.demoMode=false;empty.state=new State();empty.file=Path.Combine(testFolder,"empty.json");empty.Close();await WaitUntil(()=>!empty.IsVisible);if(!empty.closingApproved)throw new Exception("Empty close failed");
-    await RunInteractionChecks(testFolder);
+    await RunInteractionChecks(testFolder);await RunUsabilityChecks(testFolder);
     Console.WriteLine("PASS: batching, periodic timer, no immediate POST, cache persistence, uncertain non-retry, failure blocks close, successful close flushes.");
     app.Shutdown(0);
    }catch(Exception ex){Console.Error.WriteLine(ex);if(window!=null){window.closingApproved=true;window.Close();}app.Shutdown(1);}
@@ -55,5 +55,4 @@ public partial class Blocks {
   while(!ready()){if(DateTime.UtcNow>deadline)throw new Exception("Async lifecycle timeout");await Task.Delay(20);}
  }
 }
-
 

@@ -130,7 +130,7 @@ public partial class Blocks {
    var existing=state.Entries.FindIndex(e=>e.LocalKey!=null&&e.LocalKey==change.Desired.LocalKey);
    if(existing>=0)state.Entries[existing]=change.Desired;else state.Entries.Add(change.Desired);
   }
-  if(state.CachedWeek!=default)week=state.CachedWeek;
+  if(state.CachedWeek!=default)week=state.CachedWeek;customFrom=state.CachedFrom;customThrough=state.CachedThrough;if(!customFrom.HasValue||!customThrough.HasValue||!ValidDisplayRange(customFrom.Value,customThrough.Value)){customFrom=null;customThrough=null;}rangeDayWidth=state.CachedDayWidth>=100?Math.Clamp(state.CachedDayWidth,100,400):180;RefreshReuse();
   Render();status.Text="キャッシュ表示（接続確認中）";
  }
  async Task ConnectAsync() {
@@ -149,7 +149,7 @@ public partial class Blocks {
    connectionBadge.Text="接続: "+(settings.Accounts.FirstOrDefault(a=>a.Id==settings.ActiveAccountId)?.Name??service.Me.Username)+" / "+service.Me.Username+" · "+service.Me.Timezone;
    needsRefresh=false;savePaused=state.Pending.Any(p=>p.Attempted);
    await RefreshView();
-   if(state.Pending.Count==0){ClearHistory();progressText.Text="今週の実績を読み込み中…";week=Monday(DateTime.Today);state.Entries=await service.ReadWeekAsync(week);}
+   if(state.Pending.Count==0){ClearHistory();progressText.Text="今週の実績を読み込み中…";var current=Monday(DateTime.Today);var entries=await service.ReadWeekAsync(current);week=current;customFrom=null;customThrough=null;state.Entries=entries;SeedInputHistory(entries);RefreshReuse();}
    Render();Persist();status.Text=state.Pending.Count>0?"未保存の変更をキャッシュから復元しました":"Kimai読込済み";
    if(savePaused)MessageBox.Show(progressWindow,"送信途中の変更を復元しました。「再読込」で保存結果を確認してください。","保存結果の確認が必要です");
   }catch(Exception ex){needsRefresh=true;savePaused=true;MessageBox.Show(progressWindow,SafeError(ex),"接続・読み込み失敗");}
@@ -177,7 +177,7 @@ public partial class Blocks {
    if(before!=null){RestoreEntry(en,parts[0]);PendingQueue.Edit(state.Pending,en,before);foreach(var part in parts.Skip(1)){state.Entries.Add(part);PendingQueue.Edit(state.Pending,part,null);}}
    else {RestoreEntry(en,parts[0]);state.Entries.Add(en);PendingQueue.Edit(state.Pending,en,null);foreach(var part in parts.Skip(1)){state.Entries.Add(part);PendingQueue.Edit(state.Pending,part,null);}}
   }else {if(SameValues(desired,before)){RestoreEntry(en,desired);return Task.CompletedTask;}Remember();RestoreEntry(en,desired);PendingQueue.Edit(state.Pending,en,before);}
-  if(before==null){selectedKeys.Clear();selected=null;selectionAnchor=null;editorDirty=false;}Save();Render();status.Text="未保存 "+state.Pending.Count+" 件 · "+settings.SaveSeconds+"秒ごとに保存";return Task.CompletedTask;
+  RecordInput(en);RefreshReuse();if(before==null){selectedKeys.Clear();selected=null;selectionAnchor=null;editorDirty=false;}Save();Render();status.Text="未保存 "+state.Pending.Count+" 件 · "+settings.SaveSeconds+"秒ごとに保存";return Task.CompletedTask;
  }
  Task DeleteEntry(Entry en) {if(!selectedKeys.Contains(EditingModel.Key(en))){selectedKeys.Clear();selectedKeys.Add(EditingModel.Key(en));selected=en;}return DeleteSelection();}
  async Task<bool> FlushAsync(bool manual) {
@@ -207,13 +207,13 @@ public partial class Blocks {
   if(service==null||needsRefresh){await ConnectAsync();if(service==null||needsRefresh)return;}
   if((state.Pending.Any(p=>p.Attempted)||savePaused&&state.Pending.Any(p=>p.Original!=null))&&!await ResolveUncertain())return;
   if(!await FlushAsync(true))return;
-  await ReadRemote(week,true);
+  await ReadRemote(week,true,customFrom,customThrough,rangeDayWidth);
  }
- async Task ReadRemote(DateTime target,bool catalog) {
+ async Task ReadRemote(DateTime target,bool catalog,DateTime? from=null,DateTime? through=null,double? columnWidth=null) {
   if(service==null)return;await BeginProgress("Kimaiから読み込み中…");
   try {
    if(catalog){await LoadCatalog(service,true);await RefreshView();}
-   var entries=await service.ReadWeekAsync(target);ClearHistory();week=target;state.Entries=entries;selected=null;needsRefresh=false;savePaused=false;Render();Persist();status.Text="Kimai読込済み · "+entries.Count+" 件";
+   var entries=await service.ReadRangeAsync(from.HasValue?Monday(from.Value):target,through.HasValue?Monday(through.Value).AddDays(7):target.AddDays(7));ClearHistory();week=target;customFrom=from;customThrough=through;rangeDayWidth=columnWidth??rangeDayWidth;if(from.HasValue)dayView=false;statisticsDay=from??target;state.Entries=entries;SeedInputHistory(entries);RefreshReuse();UpdateViewTools();selected=null;needsRefresh=false;savePaused=false;Render();Persist();status.Text="Kimai読込済み · "+entries.Count+" 件";
   }catch(Exception ex){needsRefresh=true;MessageBox.Show(progressWindow,SafeError(ex),"読み込み失敗");}
   finally {EndProgress();}
  }
