@@ -31,6 +31,13 @@ public partial class Blocks {
    // Native mouse capture is unavailable on some headless test desktops. Exercise the
    // gesture guard independently of capture, then release before committing the zoom.
    w.dragActive=true;await Task.Delay(180);Check(w.entryBoxes[entry]==box,"Zoom timer replaced active gesture visual");w.dragActive=false;if(box.IsMouseCaptured)box.ReleaseMouseCapture();w.SetZoom(100);
+   foreach(double scale in new[]{72.0,144.0,288.0,576.0})foreach(double fraction in new[]{.1,.51,.99}){double y=(540+5*fraction)/60*scale;Check(CellMinute(y/scale*60)==540,"Cell lower half rounded to next row");}
+   Check(CellMinute(545)==545&&CellMinute(1440)==1435&&CellMinute(-1)==0,"Cell edge bounds");
+   w.SelectCellRange(w.week.AddMinutes(540),544.9);Check(w.rangeStart==w.week.AddHours(9)&&w.rangeMinutes==5&&w.rangeVisual!=null&&w.pasteTime==w.rangeStart,"Click must select one cell");
+   w.SelectCellRange(w.week.AddMinutes(540),549.9);Check(w.rangeStart==w.week.AddHours(9)&&w.rangeMinutes==10,"Downward selection omitted anchor/current cell");
+   w.SelectCellRange(w.week.AddMinutes(540),539.9);Check(w.rangeStart==w.week.AddMinutes(535)&&w.rangeMinutes==10,"Upward selection omitted anchor cell");
+   w.SelectCellRange(w.week.AddMinutes(1435),1440);Check(w.rangeMinutes==5&&w.rangeStart.Value.AddMinutes(w.rangeMinutes)==w.week.AddDays(1),"Last cell exceeded midnight");
+   w.SelectEntry(entry,ModifierKeys.None);Check(w.rangeStart==null&&w.pasteTime==null,"Block selection retained stale cell range");
    Check(ValidDisplayRange(w.week,w.week.AddDays(30))&&!ValidDisplayRange(w.week,w.week.AddDays(31))&&!ValidDisplayRange(w.week,w.week.AddDays(-1)),"Display range bounds");
    await w.ChangeRange(w.week.AddDays(2),w.week.AddDays(32),210);w.UpdateLayout();Check(w.DisplayDayCount==31&&w.DisplayStart==new DateTime(2026,9,23)&&Math.Abs(w.DayWidth-210)<.1&&w.calendarScroll.ScrollableWidth>1000,"Custom range width / horizontal scroll");
    int beforeWidthChange=mock.Methods.Count;await w.ChangeRange(w.customFrom.Value,w.customThrough.Value,220);w.UpdateLayout();Check(mock.Methods.Count==beforeWidthChange&&Math.Abs(w.DayWidth-220)<.1,"Width-only edit made network requests");

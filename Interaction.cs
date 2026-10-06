@@ -22,7 +22,7 @@ public partial class Blocks {
   RenderEditor();UpdateEditToolbar();
  }
  bool SelectEntry(Entry en,ModifierKeys modifiers) {
-  if(!ApplyEditor())return false;string key=EditingModel.Key(en);var visible=VisibleEntries().OrderBy(e=>e.Start).ThenBy(e=>e.Project).ToList();
+  if(!ApplyEditor())return false;rangeStart=null;pasteTime=null;DrawSelectedRange();string key=EditingModel.Key(en);var visible=VisibleEntries().OrderBy(e=>e.Start).ThenBy(e=>e.Project).ToList();
   if(modifiers.HasFlag(ModifierKeys.Shift)&&selectionAnchor!=null){int a=visible.FindIndex(e=>EditingModel.Key(e)==selectionAnchor),b=visible.FindIndex(e=>EditingModel.Key(e)==key);if(a>=0&&b>=0){if(!modifiers.HasFlag(ModifierKeys.Control))selectedKeys.Clear();foreach(var row in visible.Skip(Math.Min(a,b)).Take(Math.Abs(a-b)+1))selectedKeys.Add(EditingModel.Key(row));}}
   else if(modifiers.HasFlag(ModifierKeys.Control)){if(!selectedKeys.Add(key))selectedKeys.Remove(key);selectionAnchor=key;}
   else {if(!selectedKeys.Contains(key)){selectedKeys.Clear();selectedKeys.Add(key);}selectionAnchor=key;}
@@ -55,7 +55,7 @@ public partial class Blocks {
    else if(e.Key==Key.Delete){e.Handled=true;await DeleteSelection();}
    else if(e.Key==Key.F2&&selected!=null){e.Handled=true;BeginInlineComment(selected);}
    else if(e.Key==Key.Enter&&selected!=null){e.Handled=true;Edit(selected);}
-   else if(e.Key==Key.Escape){e.Handled=true;selectedKeys.Clear();selected=null;RefreshSelection();}
+   else if(e.Key==Key.Escape){e.Handled=true;rangeStart=null;pasteTime=null;DrawSelectedRange();selectedKeys.Clear();selected=null;RefreshSelection();}
    else if(ctrl&&(e.Key==Key.Add||e.Key==Key.OemPlus)){e.Handled=true;SetZoom(Hour/144*100+25);}
    else if(ctrl&&(e.Key==Key.Subtract||e.Key==Key.OemMinus)){e.Handled=true;SetZoom(Hour/144*100-25);}
   };

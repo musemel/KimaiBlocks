@@ -157,7 +157,7 @@ public partial class Blocks : Window {
  async void DropWork(object sender,DragEventArgs e) {
   if(!CanEdit()||!ApplyEditor())return;var pos=e.GetPosition(board);if(pos.X<Gutter)return;
   var work=ResolveDroppedWork(e.Data);if(work==null)return;e.Handled=true;
-  int d=Math.Clamp((int)((pos.X-Gutter)/DayWidth),0,DisplayDayCount-1);int minute=Math.Clamp(Snap(pos.Y/Hour*60),0,1435);
+  int d=Math.Clamp((int)((pos.X-Gutter)/DayWidth),0,DisplayDayCount-1);int minute=CellMinute(pos.Y/Hour*60);
   var en=new Entry {Project=work[0],Activity=work[1],Start=rangeStart??DisplayStart.AddDays(d).AddMinutes(minute),Minutes=rangeStart.HasValue?rangeMinutes:Math.Min(60,1440-minute)};
   var reusable=DroppedInput(e.Data);if(reusable!=null){en.Note=reusable.Note;en.Minutes=rangeStart.HasValue?rangeMinutes:Math.Min(reusable.Minutes,1440-minute);}
   if(!AssignIds(en))return;await FinishBlockDrag(null,null,en,true,0);rangeStart=null;Render();
