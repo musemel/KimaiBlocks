@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -27,7 +27,7 @@ public sealed class ReportSnapshot {
 }
 public sealed partial class KimaiService {
  public async Task<ReportSnapshot> ReadReportAsync(DateTime? from,DateTime? through,IProgress<string> progress,CancellationToken cancellation) {
-  if(from.HasValue!=through.HasValue||from>through||through?.Date==DateTime.MaxValue.Date)throw new ArgumentException("開始日・終了日を確認してください。");
+  if(from>through||through?.Date==DateTime.MaxValue.Date)throw new ArgumentException("開始日・終了日を確認してください。");
   var result=new ReportSnapshot {From=from?.Date,Through=through?.Date,Timezone=Me.Timezone,Notice="APIが閲覧を許可した範囲の集計です。全員・全実績を取得できたことを保証するものではありません。"};
   progress?.Report("ユーザー一覧を取得しています…");
   try {
@@ -40,7 +40,7 @@ public sealed partial class KimaiService {
   for(int page=1;page<=1000;page++) {
    cancellation.ThrowIfCancellationRequested();int current=page;
    progress?.Report("実績を取得しています… "+records.Count+"件 / "+page+"ページ");
-   var batch=await client.Api.Timesheets.GetAsync(c=>{var q=c.QueryParameters;q.User="all";q.Full="false";q.Page=current.ToString();q.Size="500";q.OrderBy="id";q.Order="ASC";if(from.HasValue){q.Begin=LocalDate(from.Value.Date);q.End=LocalDate(through.Value.Date.AddDays(1).AddSeconds(-1));}},cancellation)??new List<TimesheetCollection>();
+   var batch=await client.Api.Timesheets.GetAsync(c=>{var q=c.QueryParameters;q.User="all";q.Full="false";q.Page=current.ToString();q.Size="500";q.OrderBy="id";q.Order="ASC";if(from.HasValue)q.Begin=LocalDate(from.Value.Date);if(through.HasValue)q.End=LocalDate(through.Value.Date.AddDays(1).AddSeconds(-1));},cancellation)??new List<TimesheetCollection>();
    int before=records.Count;
    foreach(var t in batch) {
     if(!t.Id.HasValue||!t.User.HasValue||!t.Project.HasValue||!t.Activity.HasValue||!t.Begin.HasValue)throw new KimaiFailure("集計用実績の必須項目が不足しています。取得を中止しました。");
@@ -61,4 +61,3 @@ public sealed partial class KimaiService {
   result.Retrieved=DateTime.Now;return result;
  }
 }
-

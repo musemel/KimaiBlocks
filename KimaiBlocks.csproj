@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Version>2026.10.7.0207</Version>
+    <Version>2026.10.9.0231</Version>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
@@ -11,7 +11,9 @@
     <ApplicationIcon>Assets/KimaiBlocks.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
-    <None Update="defaults.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="defaults.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="settings.override.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="settings.policy.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Resource Include="Assets/KimaiBlocks.ico" />
     <PackageReference Include="MarkZither.KimaiDotNet.ApiClient" Version="1.0.0" />
   </ItemGroup>

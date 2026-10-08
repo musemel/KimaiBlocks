@@ -1,0 +1,27 @@
+{
+  "FormatVersion": 1,
+  "ServerUrl": "https://kimai.example.com",
+  "Rows": [
+    {
+      "ProjectId": 1,
+      "ProjectName": "プロジェクトA",
+      "Header": "第1期間",
+      "From": "2026-10-01",
+      "Through": "2026-10-15"
+    },
+    {
+      "ProjectId": 1,
+      "ProjectName": "プロジェクトA",
+      "Header": "第2期間",
+      "From": "2026-10-16",
+      "Through": "2026-10-31"
+    },
+    {
+      "ProjectId": 2,
+      "ProjectName": "プロジェクトB",
+      "Header": "第1期間",
+      "From": "2026-10-05",
+      "Through": "2026-10-20"
+    }
+  ]
+}

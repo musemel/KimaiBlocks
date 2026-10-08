@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Diagnostics;
@@ -10,16 +10,6 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 
-public sealed class DistributionDefaults {
- public int ProjectPalette {get;set;}=16;
- public bool AvoidColorCollisions {get;set;}=false;
- public string ActivityGroupingPattern {get;set;}=ActivityGrouping.DefaultPattern;
- public CalendarRules Calendar {get;set;}=new CalendarRules();
- public string Url {get;set;}="";
- public int SaveSeconds {get;set;}=60;
- public int CatalogMinutes {get;set;}=60;
- public string UpdateFolder {get;set;}="";
-}
 public partial class Blocks {
  static string AppVersion=>Assembly.GetExecutingAssembly().GetName().Version.ToString();
  readonly DispatcherTimer clockTimer=new DispatcherTimer {Interval=TimeSpan.FromSeconds(1)};
@@ -34,14 +24,7 @@ public partial class Blocks {
   double y=now.TimeOfDay.TotalHours*Hour;
   nowLine=new Border {Height=2,Width=DayWidth,Background=Brushes.Crimson,IsHitTestVisible=false};Canvas.SetLeft(nowLine,Gutter+day*DayWidth);Canvas.SetTop(nowLine,y);Panel.SetZIndex(nowLine,1000);board.Children.Add(nowLine);
  }
- void LoadDefaults() {
-  string path=Path.Combine(AppContext.BaseDirectory,"defaults.json");if(!File.Exists(path))return;
-  var value=JsonSerializer.Deserialize<DistributionDefaults>(File.ReadAllText(path),new JsonSerializerOptions {PropertyNameCaseInsensitive=true})??new DistributionDefaults();
-  settings.ProjectPalette=new[]{0,16,256}.Contains(value.ProjectPalette)?value.ProjectPalette:16;settings.AvoidColorCollisions=value.AvoidColorCollisions;
-  var calendar=value.Calendar??new CalendarRules();calendar.Intervals();calendar.HolidayDates();settings.Calendar=calendar;
-  _ = new ActivityGrouping(value.ActivityGroupingPattern);settings.ActivityGroupingPattern=value.ActivityGroupingPattern;
-  settings.Url=value.Url??"";settings.SaveSeconds=Math.Clamp(value.SaveSeconds,10,3600);settings.CatalogMinutes=Math.Clamp(value.CatalogMinutes,1,1440);settings.UpdateFolder=value.UpdateFolder??"";
- }
+ void LoadDefaults(string directory=null) {try{string path=Path.Combine(directory??AppContext.BaseDirectory,"defaults.json");defaultsJson=File.Exists(path)?File.ReadAllText(path):null;settings=SettingsLayers.Load(defaultsJson);}catch(Exception ex){throw new ArgumentException("defaults.json を読み込めません: "+ex.Message);}}
  bool checkingUpdates;
  async Task CheckUpdates(bool manual) {
   if(checkingUpdates)return;
@@ -59,7 +42,7 @@ public partial class Blocks {
  void ShowUpdateDialog(string folder,Version available) {
   var w=new Window {Title="アップデート",Owner=this,Width=550,SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner};
   var panel=new StackPanel {Margin=new Thickness(20)};w.Content=panel;
-  var message=Label((available>Version.Parse(AppVersion)?"新しいバージョンがあります":"新しいバージョンはありません")+"\n現在: "+AppVersion+"\n配布版: "+available+"\n\n保存して終了後、配布フォルダの一式をコピーしてください。\nsettings.policy.json がある場合は一緒にコピーしてください。",13);message.TextWrapping=TextWrapping.Wrap;panel.Children.Add(message);
+  var message=Label((available>Version.Parse(AppVersion)?"新しいバージョンがあります":"新しいバージョンはありません")+"\n現在: "+AppVersion+"\n配布版: "+available+"\n\n保存して終了後、配布フォルダの一式をコピーしてください。\nsettings.override.json がある場合は一緒にコピーしてください。",13);message.TextWrapping=TextWrapping.Wrap;panel.Children.Add(message);
   panel.Children.Add(new TextBox {Text=folder,IsReadOnly=true,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(4,12,4,8)});
   panel.Children.Add(ButtonOf("配布フォルダを開く",()=>{try{if(!Directory.Exists(folder))throw new IOException("配布フォルダにアクセスできません。");Process.Start(new ProcessStartInfo {FileName=Path.GetFullPath(folder),UseShellExecute=true});}catch(Exception ex){MessageBox.Show(w,SafeError(ex),"フォルダを開けません");}}));
   panel.Children.Add(ButtonOf("閉じる",()=>w.Close()));w.ShowDialog();

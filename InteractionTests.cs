@@ -53,7 +53,7 @@ public partial class Blocks {
    w.BeginInlineComment(a);w.inlineComment.Text="Enter confirms";w.inlineComment.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice,PresentationSource.FromVisual(w),0,Key.Enter) {RoutedEvent=Keyboard.PreviewKeyDownEvent});if(w.inlineComment!=null||a.Note!="Enter confirms")throw new Exception("F2 Enter confirmation");
    void CaptureDialog(string title,string name,Action open){w.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle,new Action(()=>{var dialog=w.OwnedWindows.Cast<Window>().Single(x=>x.Title==title);dialog.UpdateLayout();var content=(FrameworkElement)dialog;var shot=new RenderTargetBitmap((int)content.ActualWidth,(int)content.ActualHeight,96,96,PixelFormats.Pbgra32);shot.Render(content);var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(shot));using(var file=File.Create(Path.Combine(AppContext.BaseDirectory,name)))encoder.Save(file);dialog.Close();}));open();}
    CaptureDialog("プロジェクトの固定色","color-picker-preview.png",()=>w.ColorDialog(Projects[0]));
-   string ownPattern=w.settings.ActivityGroupingPattern,ownFolder=w.settings.UpdateFolder;w.managedSettings=ManagedSettings.Read("{\"ActivityGroupingPattern\":\"(.*):(.*)\",\"UpdateFolder\":\"managed-folder\"}");if(w.EffectiveActivityPattern!="(.*):(.*)"||w.EffectiveUpdateFolder!="managed-folder"||w.settings.ActivityGroupingPattern!=ownPattern||w.settings.UpdateFolder!=ownFolder)throw new Exception("Managed policy overwrote personal settings");w.managedSettings=new ManagedSettings();if(w.EffectiveActivityPattern!=ownPattern||w.EffectiveUpdateFolder!=ownFolder)throw new Exception("Managed policy removal fallback");
+   string ownPattern=w.settings.ActivityGroupingPattern,ownFolder=w.settings.UpdateFolder;w.managedSettings=ManagedSettings.Read("{\"ActivityGroupingPattern\":\"(.*):(.*)\",\"UpdateFolder\":\"managed-folder\"}");w.ApplyManagedSettings();if(w.EffectiveActivityPattern!="(.*):(.*)"||w.EffectiveUpdateFolder!="managed-folder"||!w.Locked("ActivityGroupingPattern"))throw new Exception("Managed override not applied");w.managedSettings=new ManagedSettings();w.settings.ActivityGroupingPattern=ownPattern;w.settings.UpdateFolder=ownFolder;
    CaptureDialog("表示・作業ツリー","view-settings-preview.png",w.ViewSettingsDialog);
    foreach(var activity in w.service.Activities)activity.Name="開発作業/仕様の確認と画面の表示調整を行う長いアクティビティ名";w.state.Hidden.Clear();w.state.Favorites.Clear();w.state.Favorites.Add(Projects[0]+"|"+w.service.ActivityName(22));w.state.FolderWorks["child"][0].Activity=w.service.ActivityName(22);w.state.ExpandedNodes.AddRange(new[]{"project:"+Projects[0],"activity-regex:"+Projects[0]+"/開発作業","folder:child","folder:favorites"});w.Populate();w.Render();w.UpdateLayout();w.calendarScroll.ScrollToVerticalOffset(8*Hour);w.UpdateLayout();
    if(w.editorProject.SelectedItem==null||w.editorProject.Text!=(string)w.editorProject.SelectedItem)throw new Exception("Project picker lost current value");
@@ -69,7 +69,6 @@ public partial class Blocks {
   }finally {w.closingApproved=true;w.Close();}
  }
 }
-
 
 
 

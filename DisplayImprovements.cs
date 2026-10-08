@@ -10,7 +10,7 @@ public partial class Blocks {
  readonly DispatcherTimer zoomTimer=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(120)};
  double zoomScale=1,zoomAnchor;bool zoomHooked;
  void PreviewZoom(int delta,double anchor) {
-  if(dragActive||!ApplyEditor())return;
+  if(Locked("ZoomPercent")||dragActive||!ApplyEditor())return;
   if(!zoomHooked){zoomHooked=true;zoomTimer.Tick+=(s,e)=>{if(dragActive||System.Windows.Input.Mouse.LeftButton==System.Windows.Input.MouseButtonState.Pressed)return;zoomTimer.Stop();SetZoom(Hour/144*100*zoomScale,zoomAnchor);};Closed+=(s,e)=>zoomTimer.Stop();}
   double minute=(calendarScroll.VerticalOffset+anchor)/(Hour*zoomScale);
   double percent=Math.Clamp(Hour/144*100*zoomScale*Math.Pow(1.1,delta/120.0),50,400);

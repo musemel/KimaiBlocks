@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -43,7 +43,7 @@ public sealed class AccountProfile {
 public partial class Blocks {
  void ConnectionDialog() {
   if(communicating)return;
-  AccountProfile.Migrate(settings);
+  AccountProfile.Migrate(settings);ApplyManagedSettings();
   var accounts=new ObservableCollection<AccountProfile>(settings.Accounts.Select(a=>a.Copy()));
   var w=new Window {Title="設定 / アカウント",Owner=this,Width=880,Height=750,MinWidth=740,MinHeight=620,WindowStartupLocation=WindowStartupLocation.CenterOwner};
   var panel=new DockPanel {Margin=new Thickness(20)};w.Content=panel;
@@ -56,9 +56,9 @@ public partial class Blocks {
   var table=new DataGrid {ItemsSource=accounts,AutoGenerateColumns=false,IsReadOnly=true,CanUserAddRows=false,CanUserDeleteRows=false,SelectionMode=DataGridSelectionMode.Single,SelectionUnit=DataGridSelectionUnit.FullRow,Margin=new Thickness(0,8,0,16)};
   void Column(string title,string property,double width){table.Columns.Add(new DataGridTextColumn {Header=title,Binding=new Binding(property),Width=new DataGridLength(width,DataGridLengthUnitType.Star)});}
   Column("表示名","Name",1);Column("ユーザー名","Username",1);Column("Kimai URL","Url",1.6);Column("APIトークン","TokenDisplay",.7);Column("認証","Authentication",.6);
-  table.SelectedItem=accounts.FirstOrDefault(a=>a.Id==settings.ActiveAccountId)??accounts.FirstOrDefault();panel.Children.Add(table);
-  void EditSelected(){var selected=table.SelectedItem as AccountProfile;if(selected==null)return;var updated=EditAccount(w,selected);if(updated!=null){int index=accounts.IndexOf(selected);accounts[index]=updated;table.SelectedItem=updated;}}
-  actions.Children.Add(ButtonOf("追加…",()=>{var account=EditAccount(w,new AccountProfile {Url=settings.Url,AllowHttp=settings.AllowHttp});if(account!=null){accounts.Add(account);table.SelectedItem=account;}}));
+  table.SelectedItem=accounts.FirstOrDefault(a=>a.Id==settings.ActiveAccountId)??accounts.FirstOrDefault();panel.Children.Add(table);LockSetting(table,"ActiveAccountId");LockSetting(actions,"Accounts");
+  void EditSelected(){if(Locked("Accounts"))return;var selected=table.SelectedItem as AccountProfile;if(selected==null)return;var updated=EditAccount(w,selected);if(updated!=null){int index=accounts.IndexOf(selected);accounts[index]=updated;table.SelectedItem=updated;}}
+  actions.Children.Add(ButtonOf("追加…",()=>{var account=EditAccount(w,NewDefaultAccount());if(account!=null){accounts.Add(account);table.SelectedItem=account;}}));
   actions.Children.Add(ButtonOf("編集…",EditSelected));
   actions.Children.Add(ButtonOf("一覧から削除",()=>{var account=table.SelectedItem as AccountProfile;if(account==null)return;if(MessageBox.Show(w,"「"+account.Name+"」を保存するアカウント一覧から削除しますか？\nKimai側のユーザー・実績・APIトークン自体は削除しません。\n一覧の変更は「保存して接続」で確定します。","アカウント一覧",MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)!=MessageBoxResult.Yes)return;accounts.Remove(account);table.SelectedItem=accounts.FirstOrDefault();}));
   table.MouseDoubleClick+=(s,e)=>{if(ItemsControl.ContainerFromElement(table,e.OriginalSource as DependencyObject) is DataGridRow)EditSelected();};
@@ -88,7 +88,7 @@ public partial class Blocks {
   string[] labels={"表示名（例: 業務用・個人用）","Kimai URL","ユーザー名（Bearerでは管理用、旧方式では認証に使用）","APIトークン"};Control[] controls={name,url,username,token};
   for(int i=0;i<labels.Length;i++){panel.Children.Add(Label(labels[i],12));controls[i].Padding=new Thickness(6);panel.Children.Add(controls[i]);}
   var legacy=new CheckBox {Content="旧認証方式（ユーザー名＋APIトークン）",IsChecked=source.Legacy,Margin=new Thickness(4,14,4,8)};
-  var http=new CheckBox {Content="この接続先でHTTPを許可（通信は暗号化されません）",IsChecked=source.AllowHttp,Margin=new Thickness(4,8,4,8)};url.TextChanged+=(s,e)=>http.IsChecked=false;panel.Children.Add(legacy);panel.Children.Add(http);
+  var http=new CheckBox {Content="この接続先でHTTPを許可（通信は暗号化されません）",IsChecked=source.AllowHttp,Margin=new Thickness(4,8,4,8)};url.TextChanged+=(s,e)=>{if(!Locked("AllowHttp"))http.IsChecked=false;};panel.Children.Add(legacy);panel.Children.Add(http);LockSetting(url,"Url");LockSetting(username,"Username");LockSetting(token,"ProtectedToken");LockSetting(legacy,"Legacy");LockSetting(http,"AllowHttp");
   if(!tokenReadable)panel.Children.Add(Label("保存済みトークンを復号できません。再入力してください。",12));
   AccountProfile result=null;
   panel.Children.Add(ButtonOf("一覧に反映",()=>{
@@ -102,6 +102,5 @@ public partial class Blocks {
   }));panel.Children.Add(ButtonOf("キャンセル",()=>w.Close()));w.ShowDialog();return result;
  }
 }
-
 
 

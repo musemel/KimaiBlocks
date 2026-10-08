@@ -42,7 +42,7 @@ public partial class Blocks {
     window.Close();await WaitUntil(()=>window.closingApproved&&!window.IsVisible);
     if(window.IsVisible||window.state.Pending.Count!=0)throw new Exception("Successful close did not save");
     Projects=new[]{"A","B","C","D"};var empty=new Blocks(true);empty.Show();empty.demoMode=false;empty.state=new State();empty.file=Path.Combine(testFolder,"empty.json");empty.Close();await WaitUntil(()=>!empty.IsVisible);if(!empty.closingApproved)throw new Exception("Empty close failed");
-    await RunInteractionChecks(testFolder);await RunUsabilityChecks(testFolder);
+    await RunInteractionChecks(testFolder);await RunUsabilityChecks(testFolder);await RunRevisionUiChecks(testFolder);
     Console.WriteLine("PASS: batching, periodic timer, no immediate POST, cache persistence, uncertain non-retry, failure blocks close, successful close flushes.");
     app.Shutdown(0);
    }catch(Exception ex){Console.Error.WriteLine(ex);if(window!=null){window.closingApproved=true;window.Close();}app.Shutdown(1);}

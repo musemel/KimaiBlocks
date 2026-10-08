@@ -83,12 +83,12 @@ public partial class Blocks {
   var w=new Window {Title="休日・休み時間・時間外",Owner=this,Width=510,Height=760,ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterOwner};
   var panel=new StackPanel {Margin=new Thickness(22)};w.Content=new ScrollViewer {Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
   panel.Children.Add(Label("毎週の休日",15));var days=new WrapPanel();var checks=new List<CheckBox>();
-  string[] labels={"日","月","火","水","木","金","土"};for(int d=0;d<7;d++){var c=new CheckBox {Content=labels[d],IsChecked=(Rules.DaysOff??Array.Empty<int>()).Contains(d),Margin=new Thickness(8)};checks.Add(c);days.Children.Add(c);}panel.Children.Add(days);
-  panel.Children.Add(Label("追加の休業日（1行に1日、例: 2026-12-31）",12));var holidays=new TextBox {Text=Rules.Holidays,Height=90,AcceptsReturn=true,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};panel.Children.Add(holidays);
-  panel.Children.Add(Label("毎日の休み時間（1行に1区間、例: 12:00-13:00）",12));var breaks=new TextBox {Text=Rules.Breaks,Height=90,AcceptsReturn=true,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};panel.Children.Add(breaks);
-  panel.Children.Add(Label("毎日の時間外（例: 00:00-09:00、18:00-24:00を別行に）",12));var offHours=new TextBox {Text=Rules.OffHours,Height=70,AcceptsReturn=true,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};panel.Children.Add(offHours);
+  string[] labels={"日","月","火","水","木","金","土"};for(int d=0;d<7;d++){var c=new CheckBox {Content=labels[d],IsChecked=(Rules.DaysOff??Array.Empty<int>()).Contains(d),Margin=new Thickness(8)};checks.Add(c);days.Children.Add(c);LockSetting(c,"Calendar.DaysOff");}panel.Children.Add(days);
+  panel.Children.Add(Label("追加の休業日（1行に1日、例: 2026-12-31）",12));var holidays=new TextBox {Text=Rules.Holidays,Height=90,AcceptsReturn=true,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};panel.Children.Add(holidays);LockSetting(holidays,"Calendar.Holidays");
+  panel.Children.Add(Label("毎日の休み時間（1行に1区間、例: 12:00-13:00）",12));var breaks=new TextBox {Text=Rules.Breaks,Height=90,AcceptsReturn=true,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};panel.Children.Add(breaks);LockSetting(breaks,"Calendar.Breaks");
+  panel.Children.Add(Label("毎日の時間外（例: 00:00-09:00、18:00-24:00を別行に）",12));var offHours=new TextBox {Text=Rules.OffHours,Height=70,AcceptsReturn=true,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};panel.Children.Add(offHours);LockSetting(offHours,"Calendar.OffHours");
   var shade=new CheckBox {Content="休日・休み時間・時間外を暗色で表示",IsChecked=Rules.Shade,Margin=new Thickness(4,16,4,8)};
-  var block=new CheckBox {Content="休日・休み時間・時間外への入力を禁止",IsChecked=Rules.BlockInput,Margin=new Thickness(4,8,4,12)};panel.Children.Add(shade);panel.Children.Add(block);
+  var block=new CheckBox {Content="休日・休み時間・時間外への入力を禁止",IsChecked=Rules.BlockInput,Margin=new Thickness(4,8,4,12)};panel.Children.Add(shade);panel.Children.Add(block);LockSetting(shade,"Calendar.Shade");LockSetting(block,"Calendar.BlockInput");
   var note=Label("Kimaiユーザーの時刻で適用します。祝日は自動取得しません。\n入力禁止は新規作成・移動・時間変更に適用します。\n既存の実績や保存待ちの変更は削除しません。",12);note.TextWrapping=TextWrapping.Wrap;panel.Children.Add(note);
   panel.Children.Add(ButtonOf("保存",()=>{
    var updated=new CalendarRules {DaysOff=checks.Select((c,i)=>c.IsChecked==true?i:-1).Where(i=>i>=0).ToArray(),Holidays=holidays.Text,Breaks=breaks.Text,OffHours=offHours.Text,Shade=shade.IsChecked==true,BlockInput=block.IsChecked==true};
@@ -98,5 +98,4 @@ public partial class Blocks {
   }));w.ShowDialog();
  }
 }
-
 

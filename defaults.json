@@ -1,4 +1,4 @@
-{
+﻿{
   "ProjectPalette": 16,
   "AvoidColorCollisions": false,
   "ActivityGroupingPattern": "(.*)/(.*)",
@@ -16,6 +16,8 @@
     "OffHours": "00:00-09:00\n18:00-24:00",
     "Shade": true,
     "BlockInput": false
-  }
+  },
+  "AllowHttp": false,
+  "ExcludedReportUserIds": [],
+  "ReportMinimumHours": 8
 }
-

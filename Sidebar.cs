@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
@@ -48,7 +48,7 @@ public partial class Blocks {
   choices.Children.Add(Label("表示プロジェクト",17));
   projectSearch.Padding=new Thickness(7);projectSearch.Margin=new Thickness(3);projectSearch.ToolTip="表示対象をプロジェクト名で検索";
   choices.Children.Add(Label("プロジェクト名で検索",11));choices.Children.Add(projectSearch);
-  choices.Children.Add(ButtonOf("すべてのチェックを外す",()=>{foreach(var p in Projects)if(!state.Hidden.Contains(p))state.Hidden.Add(p);Save();PopulateProjectList();Populate();Render();}));
+  choices.Children.Add(ButtonOf("すべてのチェックを外す",()=>{foreach(var p in Projects)if(!state.Hidden.Contains(p))state.Hidden.Add(p);Save();projectList.Items.Refresh();Populate();Render();}));
   projectList.Height=420;projectList.Margin=new Thickness(3);projectList.BorderBrush=BrushOf("#E2E8F0");
   ScrollViewer.SetHorizontalScrollBarVisibility(projectList,ScrollBarVisibility.Disabled);
   VirtualizingPanel.SetIsVirtualizing(projectList,true);VirtualizingPanel.SetVirtualizationMode(projectList,VirtualizationMode.Recycling);
@@ -63,7 +63,7 @@ public partial class Blocks {
  void PopulateProjectList() {
   projectList.ItemsSource=Projects.Where(p=>Matches(p,projectSearch.Text)).OrderBy(p=>state.Hidden.Contains(p)).ThenBy(p=>p,StringComparer.CurrentCultureIgnoreCase).Select(p=>new ProjectChoice(p,()=>!state.Hidden.Contains(p),enabled=>{
    if(enabled)state.Hidden.Remove(p);else if(!state.Hidden.Contains(p))state.Hidden.Add(p);
-   Save();Populate();Render();Dispatcher.BeginInvoke(new Action(PopulateProjectList));
+   Save();Populate();Render();
   })).ToList();
  }
  static bool Matches(string value,string query) {string Clean(string s)=>new string((s??" ").Normalize(NormalizationForm.FormKC).Where(c=>!char.IsWhiteSpace(c)).ToArray());return System.Globalization.CultureInfo.GetCultureInfo("ja-JP").CompareInfo.IndexOf(Clean(value),Clean(query),System.Globalization.CompareOptions.IgnoreCase|System.Globalization.CompareOptions.IgnoreKanaType|System.Globalization.CompareOptions.IgnoreWidth)>=0;}
@@ -76,6 +76,7 @@ public partial class Blocks {
    var root=Node("未分類","root",true);root.ContextMenu=FolderMenu(null);MakeFolderTarget((FrameworkElement)root.Header,null);tree.Items.Add(root);
    AddFolders(tree,null,new HashSet<string>());
    foreach(var p in Projects.Where(p=>!state.Hidden.Contains(p)&&FolderOf(p)==null))AddProject(root,p,"");
+   if(favorites.IsChecked==true&&root.Items.Count==0)tree.Items.Remove(root);
   } finally {rebuildingTree=false;}
  }
  TreeViewItem Node(string title,string key,bool root) {

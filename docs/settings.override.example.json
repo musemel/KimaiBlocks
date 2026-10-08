@@ -1,0 +1,4 @@
+{
+  "Url": "https://kimai.example.com",
+  "ActivityGroupingPattern": "(.*)/(.*)"
+}

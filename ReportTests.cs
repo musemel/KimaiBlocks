@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -37,6 +37,8 @@ public static class ReportTests {
   Check(tables.Single(t=>t.TableName=="プロジェクト合計").Rows.Cast<DataRow>().Sum(r=>(decimal)r["完了時間(h)"])==0.5m,"Report used wall duration or running duration");
   Check(tables.Single(t=>t.TableName=="実績明細").Rows.Cast<DataRow>().Count(r=>r.IsNull("時間(h)"))==2,"Unknown duration presented as zero");
   await api.ReadReportAsync(null,null,null,CancellationToken.None);Check(!mock.Queries.Last().Contains("begin=")&&!mock.Queries.Last().Contains("end="),"All-time query limited");
+  await api.ReadReportAsync(null,new DateTime(2026,9,22),null,CancellationToken.None);Check(!mock.Queries.Last().Contains("begin=")&&mock.Queries.Last().Contains("end=2026-09-22T23:59:59"),"Unbounded start query incorrect");
+  await api.ReadReportAsync(new DateTime(2026,9,21),null,null,CancellationToken.None);Check(mock.Queries.Last().Contains("begin=2026-09-21T00:00:00")&&!mock.Queries.Last().Contains("end="),"Unbounded end query incorrect");
   Check(data.Users.All(u=>u.Id!=9),"Disabled user remained visible");
   api.Projects.Add(new MarkZither.KimaiDotNet.Models.ProjectCollection {Id=11,Visible=false});var filtered=await api.ReadReportAsync(null,null,null,CancellationToken.None);Check(filtered.Records.Count==1&&filtered.Records[0].ProjectId==12,"Disabled project included in reports");api.Projects.Clear();
   mock.DenyUsers=true;data=await api.ReadReportAsync(null,null,null,CancellationToken.None);Check(data.Users.Count==2&&data.Notice.Contains("権限がない"),"Roster permission fallback");
@@ -47,6 +49,5 @@ public static class ReportTests {
   Console.WriteLine("PASS: report permissions, paging, all-time/range queries, server durations, zero users, missing durations, partial failure and cancellation.");
  }
 }
-
 
 

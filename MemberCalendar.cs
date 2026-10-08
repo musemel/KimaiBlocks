@@ -19,9 +19,9 @@ public static class MemberReports {
  }
 }
 public partial class Blocks {
- bool ChooseMembers(Window owner,List<ReportUser> members,HashSet<int> current,out HashSet<int> result) {
+ bool ChooseMembers(Window owner,List<ReportUser> members,HashSet<int> current,out HashSet<int> result,string title="表示・集計するメンバー") {
   var rows=members.Select(u=>new MemberChoice {Id=u.Id,Name=u.Name,Selected=current==null||current.Contains(u.Id)}).OrderBy(u=>u.Name).ToList();
-  var w=new Window {Title="表示・集計するメンバー",Owner=owner,Width=510,Height=620,WindowStartupLocation=WindowStartupLocation.CenterOwner};var root=new DockPanel {Margin=new Thickness(16)};w.Content=root;
+  var w=new Window {Title=title,Owner=owner,Width=510,Height=620,WindowStartupLocation=WindowStartupLocation.CenterOwner};var root=new DockPanel {Margin=new Thickness(16)};w.Content=root;
   var searchBox=new TextBox {Padding=new Thickness(6),Margin=new Thickness(4)};DockPanel.SetDock(searchBox,Dock.Top);root.Children.Add(searchBox);
   var buttons=new WrapPanel();DockPanel.SetDock(buttons,Dock.Bottom);root.Children.Add(buttons);
   var list=new ListBox {Margin=new Thickness(4)};root.Children.Add(list);var check=new FrameworkElementFactory(typeof(CheckBox));check.SetBinding(CheckBox.ContentProperty,new Binding("Name"));check.SetBinding(CheckBox.IsCheckedProperty,new Binding("Selected") {Mode=BindingMode.TwoWay,UpdateSourceTrigger=UpdateSourceTrigger.PropertyChanged});check.SetValue(CheckBox.MarginProperty,new Thickness(5));list.ItemTemplate=new DataTemplate {VisualTree=check};
@@ -63,4 +63,3 @@ public partial class Blocks {
   Draw();w.Loaded+=(s,e)=>{scroll.ScrollToVerticalOffset(8*120);readyForTest?.Invoke(w);};w.ShowDialog();
  }
 }
-

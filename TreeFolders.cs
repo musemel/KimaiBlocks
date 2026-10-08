@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -36,6 +36,7 @@ public partial class Blocks {
     foreach(var project in Projects.Where(p=>!state.Hidden.Contains(p)&&FolderOf(p)==folder))AddProject(node,project,FolderLabel(folder));
     if(state.FolderWorks.TryGetValue(folder,out var works))foreach(var work in works.Where(x=>Projects.Contains(x.Project)&&ActivitiesFor(x.Project).Contains(x.Activity)&&Matches(x.Project+" "+x.Activity,search.Text)&&(favorites.IsChecked!=true||state.Favorites.Contains(x.Project+"|"+x.Activity))))AddWorkRow(node,work.Project,work.Activity,work.Project+" · "+work.Activity);
    }
+   if(favorites.IsChecked==true&&node.Items.Count==0)parent.Items.Remove(node);
   }
  }
  bool MoveFolder(string folder,string parent) {
@@ -92,7 +93,6 @@ public partial class Blocks {
   """);tree.ItemContainerStyle=style;tree.Resources[typeof(TreeViewItem)]=style;
  }
 }
-
 
 
 

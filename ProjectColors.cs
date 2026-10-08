@@ -28,8 +28,8 @@ public partial class Blocks {
   var w=new Window {Title="プロジェクトの固定色",Owner=this,Width=600,Height=760,WindowStartupLocation=WindowStartupLocation.CenterOwner};var root=new DockPanel {Margin=new Thickness(16)};w.Content=root;Action refreshRows=()=>{};
   var automatic=new StackPanel {Margin=new Thickness(0,0,0,12)};DockPanel.SetDock(automatic,Dock.Top);root.Children.Add(automatic);
   automatic.Children.Add(Label("自動色（プロジェクト名から決定）",15));
-  var palette=new ComboBox {ItemsSource=new[]{"固定16色（標準）","固定256色","無制限"},SelectedIndex=settings.ProjectPalette==16?0:settings.ProjectPalette==256?1:2,Margin=new Thickness(4)};automatic.Children.Add(palette);
-  var avoid=new CheckBox {Content="既存色と重なる場合は近縁色にする（無制限のみ）",IsChecked=settings.AvoidColorCollisions,IsEnabled=palette.SelectedIndex==2,Margin=new Thickness(4)};automatic.Children.Add(avoid);palette.SelectionChanged+=(s,e)=>avoid.IsEnabled=palette.SelectedIndex==2;
+  var palette=new ComboBox {ItemsSource=new[]{"固定16色（標準）","固定256色","無制限"},SelectedIndex=settings.ProjectPalette==16?0:settings.ProjectPalette==256?1:2,Margin=new Thickness(4)};automatic.Children.Add(palette);LockSetting(palette,"ProjectPalette");
+  var avoid=new CheckBox {Content="既存色と重なる場合は近縁色にする（無制限のみ）",IsChecked=settings.AvoidColorCollisions,IsEnabled=palette.SelectedIndex==2,Margin=new Thickness(4)};automatic.Children.Add(avoid);LockSetting(avoid,"AvoidColorCollisions");palette.SelectionChanged+=(s,e)=>avoid.IsEnabled=palette.SelectedIndex==2&&!Locked("AvoidColorCollisions");
   automatic.Children.Add(ButtonOf("自動色の設定を保存して再設定",()=>{int old=settings.ProjectPalette;bool previous=settings.AvoidColorCollisions;try{settings.ProjectPalette=palette.SelectedIndex==0?16:palette.SelectedIndex==1?256:0;settings.AvoidColorCollisions=avoid.IsChecked==true;try{StoreSettings();}catch{settings.ProjectPalette=old;settings.AvoidColorCollisions=previous;throw;}ResetAutomaticColors();refreshRows();}catch(Exception ex){MessageBox.Show(w,SafeError(ex),"自動色の設定を保存できません");}}));
   automatic.Children.Add(Label("個別の固定色（自動色より優先）",15));
   var filter=new TextBox {Margin=new Thickness(4),Padding=new Thickness(5)};DockPanel.SetDock(filter,Dock.Top);root.Children.Add(filter);
@@ -45,7 +45,6 @@ public partial class Blocks {
   bottom.Children.Add(ButtonOf("指定色で固定",()=>Apply(true)));bottom.Children.Add(ButtonOf("自動割当へ戻す",()=>Apply(false)));bottom.Children.Add(ButtonOf("閉じる",()=>w.Close()));w.ShowDialog();
  }
 }
-
 
 
 

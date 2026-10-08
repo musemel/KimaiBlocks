@@ -16,7 +16,7 @@ public partial class Blocks {
  void BuildStatistics(DockPanel root) {
   var panel=new DockPanel {Width=320,Margin=new Thickness(0,0,12,0),Background=Brushes.White};
   statisticsPanel=panel;
-  var close=ButtonOf("×",()=>SetStatisticsVisible(false));close.HorizontalAlignment=HorizontalAlignment.Right;close.ToolTip="統計を閉じる（メニューから再表示）";var clockRow=new DockPanel();DockPanel.SetDock(clockRow,Dock.Top);DockPanel.SetDock(close,Dock.Right);clockRow.Children.Add(close);panel.Children.Add(clockRow);
+  var close=ButtonOf("×",()=>SetStatisticsVisible(false));LockSetting(close,"ShowStatistics");close.HorizontalAlignment=HorizontalAlignment.Right;close.ToolTip="統計を閉じる（メニューから再表示）";var clockRow=new DockPanel();DockPanel.SetDock(clockRow,Dock.Top);DockPanel.SetDock(close,Dock.Right);clockRow.Children.Add(close);panel.Children.Add(clockRow);
   DockPanel.SetDock(panel,Dock.Right);root.Children.Add(panel);AddPanelResizer(root,panel,Dock.Right);BuildEditor(panel);
   var detail=ButtonOf("コメント別の詳細集計…",ShowDetailedStatistics);DockPanel.SetDock(detail,Dock.Top);panel.Children.Add(detail);
   var heading=Label("実績の統計",17);heading.Margin=new Thickness(12,12,12,8);DockPanel.SetDock(heading,Dock.Top);panel.Children.Add(heading);
@@ -80,7 +80,7 @@ public partial class Blocks {
   if(entries.Count==0)dayStatistics.Children.Add(Label("この日の実績はありません",12));else dayStatistics.Children.Add(tree);
  }
  void SetStatisticsVisible(bool visible) {
-  settings.ShowStatistics=visible;
+  if(Locked("ShowStatistics"))return;settings.ShowStatistics=visible;
   statisticsPanel.Visibility=visible?Visibility.Visible:Visibility.Collapsed;if(rightGrip!=null)rightGrip.Visibility=statisticsPanel.Visibility;
   if(visible)RenderStatistics(VisibleEntries());
   try {StoreSettings();}catch(Exception ex){MessageBox.Show(this,SafeError(ex),"表示設定を保存できません");}

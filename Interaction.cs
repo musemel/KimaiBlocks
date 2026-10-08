@@ -62,9 +62,9 @@ public partial class Blocks {
   // Keep the visual under the pointer alive until the current gesture ends.
   calendarScroll.PreviewMouseWheel+=(s,e)=>{if(Keyboard.Modifiers.HasFlag(ModifierKeys.Control)){e.Handled=true;PreviewZoom(e.Delta,e.GetPosition(calendarScroll).Y);}};
  }
- void SetZoom(double percent,double anchor=0) {if(dragActive||!ApplyEditor())return;double minute=(calendarScroll.VerticalOffset+anchor)/(Hour*zoomScale);zoomTimer.Stop();zoomScale=1;board.LayoutTransform=Transform.Identity;Hour=144*Math.Clamp(percent,50,400)/100;board.Height=24*Hour;Render();calendarScroll.UpdateLayout();calendarScroll.ScrollToVerticalOffset(Math.Max(0,minute*Hour-anchor));settings.ZoomPercent=(int)Math.Round(Hour/144*100);SaveViewPreferences();status.Text="表示倍率 "+settings.ZoomPercent+"%";}
+ void SetZoom(double percent,double anchor=0) {if(Locked("ZoomPercent")||dragActive||!ApplyEditor())return;double minute=(calendarScroll.VerticalOffset+anchor)/(Hour*zoomScale);zoomTimer.Stop();zoomScale=1;board.LayoutTransform=Transform.Identity;Hour=144*Math.Clamp(percent,50,400)/100;board.Height=24*Hour;Render();calendarScroll.UpdateLayout();calendarScroll.ScrollToVerticalOffset(Math.Max(0,minute*Hour-anchor));settings.ZoomPercent=(int)Math.Round(Hour/144*100);SaveViewPreferences();status.Text="表示倍率 "+settings.ZoomPercent+"%";}
  void AddPanelResizer(DockPanel root,FrameworkElement panel,Dock side) {
-  var grip=new Thumb {Width=6,Background=BrushOf("#DCE3EA"),Cursor=Cursors.SizeWE};DockPanel.SetDock(grip,side);root.Children.Add(grip);
+  var grip=new Thumb {Width=6,Background=BrushOf("#DCE3EA"),Cursor=Cursors.SizeWE};DockPanel.SetDock(grip,side);root.Children.Add(grip);LockSetting(grip,side==Dock.Left?"LeftPanelWidth":"RightPanelWidth");
   grip.DragDelta+=(s,e)=>panel.Width=Math.Clamp(panel.Width+(side==Dock.Left?e.HorizontalChange:-e.HorizontalChange),200,Math.Min(600,Math.Max(220,ActualWidth*.38)));
   grip.DragCompleted+=(s,e)=>{if(side==Dock.Left)settings.LeftPanelWidth=panel.Width;else settings.RightPanelWidth=panel.Width;SaveViewPreferences();};
   if(side==Dock.Right)rightGrip=grip;else leftPanel=panel;
