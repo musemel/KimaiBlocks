@@ -85,6 +85,7 @@ public partial class Blocks {
   var reportMenu=Group("集計");ActionItem(reportMenu,"コメント別の詳細集計…",ShowDetailedStatistics);ActionItem(reportMenu,"サーバー実績集計（全ユーザー）…",ShowServerReports);
   var maintenance=Group("更新・配布設定");ActionItem(maintenance,"アップデートを確認",async()=>await CheckUpdates(true));
   ActionItem(maintenance,"自動保存・キャッシュ・更新先…",SyncSettingsDialog);
+  ActionItem(maintenance,"アカウント以外の設定を初期値に戻す…",ResetPreferencesDialog);
   menu.Items.Add(item);rightClock=Label("",15);rightClock.Foreground=BrushOf("#D9E6F1");rightClock.Margin=new Thickness(10,0,18,0);buttons.Children.Add(rightClock);var web=ButtonOf("Kimaiを開く",OpenKimaiBrowser);web.ToolTip="接続先のKimaiを既定のブラウザで表示";buttons.Children.Add(web);buttons.Children.Add(menu);
 
   DockPanel.SetDock(buttons,Dock.Right);top.Children.Insert(0,buttons);
