@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -46,6 +46,6 @@ public partial class Blocks {
    foreach(var group in entries.GroupBy(e=>e.Project).OrderByDescending(g=>g.Sum(e=>e.Minutes))){var rows=group.ToList();tree.Items.Add(Node(group.Key??"未設定",rows,()=>CommentsIn(rows)));}
    if(entries.Count==0)tree.Items.Add(new TreeViewItem {Header="実績なし"});
   }
-  scope.SelectionChanged+=(s,e)=>Refresh();day.SelectionChanged+=(s,e)=>Refresh();Refresh();w.ShowDialog();
+  scope.SelectionChanged+=(s,e)=>Refresh();day.SelectionChanged+=(s,e)=>Refresh();Refresh();ShowDialogLayout(w);
  }
 }

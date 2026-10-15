@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -21,13 +21,13 @@ public static class MemberReports {
 public partial class Blocks {
  bool ChooseMembers(Window owner,List<ReportUser> members,HashSet<int> current,out HashSet<int> result,string title="表示・集計するメンバー") {
   var rows=members.Select(u=>new MemberChoice {Id=u.Id,Name=u.Name,Selected=current==null||current.Contains(u.Id)}).OrderBy(u=>u.Name).ToList();
-  var w=new Window {Title=title,Owner=owner,Width=510,Height=620,WindowStartupLocation=WindowStartupLocation.CenterOwner};var root=new DockPanel {Margin=new Thickness(16)};w.Content=root;
+  var w=new Window {Title=title,Owner=owner,Width=510,Height=620,MinWidth=420,MinHeight=340,WindowStartupLocation=WindowStartupLocation.CenterOwner};var root=new DockPanel {Margin=new Thickness(16)};w.Content=root;
   var searchBox=new TextBox {Padding=new Thickness(6),Margin=new Thickness(4)};DockPanel.SetDock(searchBox,Dock.Top);root.Children.Add(searchBox);
   var buttons=new WrapPanel();DockPanel.SetDock(buttons,Dock.Bottom);root.Children.Add(buttons);
   var list=new ListBox {Margin=new Thickness(4)};root.Children.Add(list);var check=new FrameworkElementFactory(typeof(CheckBox));check.SetBinding(CheckBox.ContentProperty,new Binding("Name"));check.SetBinding(CheckBox.IsCheckedProperty,new Binding("Selected") {Mode=BindingMode.TwoWay,UpdateSourceTrigger=UpdateSourceTrigger.PropertyChanged});check.SetValue(CheckBox.MarginProperty,new Thickness(5));list.ItemTemplate=new DataTemplate {VisualTree=check};
   void Fill()=>list.ItemsSource=rows.Where(u=>Matches(u.Name,searchBox.Text)).ToList();searchBox.TextChanged+=(s,e)=>Fill();Fill();
   buttons.Children.Add(ButtonOf("全員",()=>{rows.ForEach(r=>r.Selected=true);Fill();}));buttons.Children.Add(ButtonOf("全解除",()=>{rows.ForEach(r=>r.Selected=false);Fill();}));buttons.Children.Add(ButtonOf("適用",()=>{w.DialogResult=true;}));buttons.Children.Add(ButtonOf("キャンセル",()=>w.Close()));
-  bool accepted=w.ShowDialog()==true;result=accepted?rows.Where(r=>r.Selected).Select(r=>r.Id).ToHashSet():current;return accepted;
+  bool accepted=ShowDialogLayout(w)==true;result=accepted?rows.Where(r=>r.Selected).Select(r=>r.Id).ToHashSet():current;return accepted;
  }
  void ShowMemberCalendar(Window owner,ReportSnapshot snapshot,Action<Window> readyForTest=null) {
   var w=new Window {Title="メンバー実績カレンダー（閲覧専用）",Owner=owner,Width=1200,Height=800,MinWidth=650,MinHeight=450,WindowStartupLocation=WindowStartupLocation.CenterOwner};
@@ -60,6 +60,6 @@ public partial class Blocks {
   }
   mode.SelectionChanged+=(s,e)=>Draw();date.SelectedDateChanged+=(s,e)=>Draw();users.SelectionChanged+=(s,e)=>Draw();zoom.SelectionChanged+=(s,e)=>Draw();
   scroll.PreviewMouseWheel+=(s,e)=>{if(!Keyboard.Modifiers.HasFlag(ModifierKeys.Control))return;e.Handled=true;zoom.SelectedIndex=Math.Clamp(zoom.SelectedIndex+(e.Delta>0?1:-1),0,zoom.Items.Count-1);};
-  Draw();w.Loaded+=(s,e)=>{scroll.ScrollToVerticalOffset(8*120);readyForTest?.Invoke(w);};w.ShowDialog();
+  Draw();w.Loaded+=(s,e)=>{scroll.ScrollToVerticalOffset(8*120);readyForTest?.Invoke(w);};ShowDialogLayout(w);
  }
 }

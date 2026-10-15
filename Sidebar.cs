@@ -42,26 +42,29 @@ public partial class Blocks {
   ApplyTreeGuides();BuildReuseTabs(left,filters);
  }
  void ShowProjectChoices() {
-  var w=new Window {Title="表示プロジェクト",Owner=this,Width=540,Height=660,WindowStartupLocation=WindowStartupLocation.CenterOwner};
-  var choices=new StackPanel {Margin=new Thickness(16)};w.Content=choices;
+  var w=new Window {Title="表示プロジェクト",Owner=this,Width=540,Height=660,MinWidth=480,MinHeight=360,WindowStartupLocation=WindowStartupLocation.CenterOwner};
+  var layout=new DockPanel {Margin=new Thickness(16)};w.Content=layout;var choices=new StackPanel();DockPanel.SetDock(choices,Dock.Top);layout.Children.Add(choices);
+  var draftHidden=state.Hidden.ToHashSet();
   projectSearch=new TextBox();projectList=new ListBox();
   choices.Children.Add(Label("表示プロジェクト",17));
   projectSearch.Padding=new Thickness(7);projectSearch.Margin=new Thickness(3);projectSearch.ToolTip="表示対象をプロジェクト名で検索";
   choices.Children.Add(Label("プロジェクト名で検索",11));choices.Children.Add(projectSearch);
-  choices.Children.Add(ButtonOf("すべてのチェックを外す",()=>{foreach(var p in Projects)if(!state.Hidden.Contains(p))state.Hidden.Add(p);Save();projectList.Items.Refresh();Populate();Render();}));
-  projectList.Height=420;projectList.Margin=new Thickness(3);projectList.BorderBrush=BrushOf("#E2E8F0");
+  var clearAll=ButtonOf("すべてのチェックを外す",()=>{if(MessageBox.Show(w,"検索で非表示のものも含め、すべてのプロジェクトのチェックを外しますか？\n変更はOKを押すまで反映されません。","すべてのチェックを外す",MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)!=MessageBoxResult.Yes)return;foreach(var p in Projects)draftHidden.Add(p);projectList.Items.Refresh();});
+  projectList.Margin=new Thickness(3,3,3,8);projectList.BorderBrush=BrushOf("#E2E8F0");
   ScrollViewer.SetHorizontalScrollBarVisibility(projectList,ScrollBarVisibility.Disabled);
   VirtualizingPanel.SetIsVirtualizing(projectList,true);VirtualizingPanel.SetVirtualizationMode(projectList,VirtualizationMode.Recycling);
   var check=new FrameworkElementFactory(typeof(CheckBox));
   check.SetBinding(CheckBox.ContentProperty,new Binding("Name"));
   check.SetBinding(CheckBox.IsCheckedProperty,new Binding("Enabled") {Mode=BindingMode.TwoWay,UpdateSourceTrigger=UpdateSourceTrigger.PropertyChanged});
   check.SetValue(CheckBox.MarginProperty,new Thickness(3,4,3,4));
-  projectList.ItemTemplate=new DataTemplate {VisualTree=check};choices.Children.Add(projectList);
-  projectSearch.TextChanged+=(s,e)=>PopulateProjectList();
-  PopulateProjectList();choices.Children.Add(ButtonOf("閉じる",()=>w.Close()));w.ShowDialog();
+  projectList.ItemTemplate=new DataTemplate {VisualTree=check};
+  projectSearch.TextChanged+=(s,e)=>PopulateProjectList(draftHidden);
+  PopulateProjectList(draftHidden);var buttons=new WrapPanel();var ok=ButtonOf("OK",()=>{var previous=state.Hidden;try{state.Hidden=draftHidden.ToList();Persist();Populate();Render();w.DialogResult=true;}catch(Exception ex){state.Hidden=previous;MessageBox.Show(w,SafeError(ex),"表示プロジェクトの保存失敗");}});ok.IsDefault=true;buttons.Children.Add(ok);var cancel=ButtonOf("キャンセル",()=>w.Close());cancel.IsCancel=true;buttons.Children.Add(cancel);var footer=new DockPanel();clearAll.HorizontalAlignment=HorizontalAlignment.Right;DockPanel.SetDock(clearAll,Dock.Right);footer.Children.Add(clearAll);footer.Children.Add(buttons);DockPanel.SetDock(footer,Dock.Bottom);layout.Children.Add(footer);layout.Children.Add(projectList);ShowDialogLayout(w);
  }
- void PopulateProjectList() {
-  projectList.ItemsSource=Projects.Where(p=>Matches(p,projectSearch.Text)).OrderBy(p=>state.Hidden.Contains(p)).ThenBy(p=>p,StringComparer.CurrentCultureIgnoreCase).Select(p=>new ProjectChoice(p,()=>!state.Hidden.Contains(p),enabled=>{
+ void PopulateProjectList(ISet<string> draft=null) {
+  bool Hidden(string name)=>draft?.Contains(name)??state.Hidden.Contains(name);
+  projectList.ItemsSource=Projects.Where(p=>Matches(p,projectSearch.Text)).OrderBy(p=>Hidden(p)).ThenBy(p=>p,StringComparer.CurrentCultureIgnoreCase).Select(p=>new ProjectChoice(p,()=>!Hidden(p),enabled=>{
+   if(draft!=null){if(enabled)draft.Remove(p);else draft.Add(p);return;}
    if(enabled)state.Hidden.Remove(p);else if(!state.Hidden.Contains(p))state.Hidden.Add(p);
    Save();Populate();Render();
   })).ToList();

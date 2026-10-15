@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -93,7 +93,7 @@ public partial class Blocks {
   var calendar=new System.Windows.Controls.Calendar {SelectedDate=week,DisplayDate=week,FirstDayOfWeek=DayOfWeek.Monday,SelectionMode=CalendarSelectionMode.SingleDate};panel.Children.Add(calendar);
   var range=Label("",12);panel.Children.Add(range);
   Action update=()=>{var monday=Monday(calendar.SelectedDate??week);range.Text=monday.ToString("yyyy/M/d")+" – "+monday.AddDays(6).ToString("M/d");};calendar.SelectedDatesChanged+=(s,e)=>update();update();
-  panel.Children.Add(ButtonOf("この週を表示",async()=>{DateTime target=Monday(calendar.SelectedDate??week);w.Close();await ChangeWeek(target);}));w.ShowDialog();
+  panel.Children.Add(ButtonOf("この週を表示",async()=>{DateTime target=Monday(calendar.SelectedDate??week);w.Close();await ChangeWeek(target);}));ShowDialogLayout(w);
  }
  void AddTotal(StackPanel panel,List<Entry> entries) {
   var value=Label(Hours(entries.Sum(e=>e.Minutes)),30);value.FontWeight=FontWeights.SemiBold;value.Foreground=BrushOf("#1971C2");panel.Children.Add(value);

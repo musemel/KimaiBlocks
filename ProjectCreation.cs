@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -62,8 +62,7 @@ public partial class Blocks {
    }finally {sending=false;SetCommunicating(false);panel.IsEnabled=true;create.IsEnabled=!submitted;}
   });panel.Children.Add(create);panel.Children.Add(ButtonOf("閉じる",()=>w.Close()));
   name.TextChanged+=(s,e)=>consent.IsChecked=false;customer.SelectionChanged+=(s,e)=>consent.IsChecked=false;folder.SelectionChanged+=(s,e)=>consent.IsChecked=false;
-  w.ShowDialog();
+  ShowDialogLayout(w);
  }
 }
-
 

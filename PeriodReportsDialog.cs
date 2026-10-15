@@ -44,6 +44,6 @@ public partial class Blocks {
   actions.Children.Add(fetch);actions.Children.Add(ButtonOf("CSV出力…",()=>ExportReportCsv(w,output)));
   var bottom=new WrapPanel();DockPanel.SetDock(bottom,Dock.Bottom);root.Children.Remove(result);root.Children.Add(bottom);root.Children.Add(result);cancel=ButtonOf("取得をキャンセル",()=>cancellation?.Cancel());cancel.IsEnabled=false;bottom.Children.Add(cancel);bottom.Children.Add(ButtonOf("閉じる",()=>w.Close()));bottom.Children.Add(ButtonOf("保存せず閉じる",()=>{discard=true;w.Close();}));
   Matrix();SelectSpec(rows.FirstOrDefault());LockSetting(editor,"PeriodReport.Rows");LockSetting(rowActions,"PeriodReport.Rows");LockSetting(import,"PeriodReport.Rows");
-  w.Closing+=(s,e)=>{if(loading){e.Cancel=true;closeAfter=true;cancellation?.Cancel();}else if(!discard&&(sameServer||rows.Count>0)&&!Save())e.Cancel=true;};w.ShowDialog();
+  w.Closing+=(s,e)=>{if(loading){e.Cancel=true;closeAfter=true;cancellation?.Cancel();}else if(!discard&&(sameServer||rows.Count>0)&&!Save())e.Cancel=true;};LimitDialogHeader(w,root,top);ShowDialogLayout(w);
  }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -63,7 +63,7 @@ public partial class Blocks {
  void SaveTemplate(Entry source,SavedInput existing=null) {
   var w=new Window {Title="定型入力を登録",Owner=this,Width=440,SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner};var panel=new StackPanel {Margin=new Thickness(18)};w.Content=panel;
   panel.Children.Add(Label("名前（コメント・作業・長さを保存）",13));var name=new TextBox {Text=existing?.Name??(string.IsNullOrWhiteSpace(source.Note)?source.Activity:source.Note.Split('\n')[0]),Margin=new Thickness(4),Padding=new Thickness(6)};panel.Children.Add(name);
-  panel.Children.Add(ButtonOf("登録",()=>{if(string.IsNullOrWhiteSpace(name.Text))return;var item=existing??new SavedInput();item.Name=name.Text.Trim();item.Value=BlockOperations.CopyAsNew(source);item.Value.Start=new DateTime(2000,1,1);item.Value.Minutes=Math.Clamp(RoundDelta(source.Minutes),5,1440);if(existing==null)state.InputTemplates.Add(item);Save();RefreshReuse();w.Close();}));panel.Children.Add(ButtonOf("キャンセル",()=>w.Close()));w.Loaded+=(s,e)=>{name.Focus();name.SelectAll();};w.ShowDialog();
+  panel.Children.Add(ButtonOf("登録",()=>{if(string.IsNullOrWhiteSpace(name.Text))return;var item=existing??new SavedInput();item.Name=name.Text.Trim();item.Value=BlockOperations.CopyAsNew(source);item.Value.Start=new DateTime(2000,1,1);item.Value.Minutes=Math.Clamp(RoundDelta(source.Minutes),5,1440);if(existing==null)state.InputTemplates.Add(item);Save();RefreshReuse();w.Close();}));panel.Children.Add(ButtonOf("キャンセル",()=>w.Close()));w.Loaded+=(s,e)=>{name.Focus();name.SelectAll();};ShowDialogLayout(w);
  }
  static Entry DroppedInput(IDataObject data)=>data.GetDataPresent("saved-input")?System.Text.Json.JsonSerializer.Deserialize<Entry>((string)data.GetData("saved-input"),new System.Text.Json.JsonSerializerOptions {IncludeFields=true}):null;
 }

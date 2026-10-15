@@ -48,7 +48,7 @@ public partial class Blocks {
   panel.Children.Add(Label("実行中のEXEフォルダ",12));
   panel.Children.Add(new TextBox {Text=AppContext.BaseDirectory,IsReadOnly=true,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(4,4,4,8)});
   panel.Children.Add(ButtonOf("実行中のEXEフォルダを開く",()=>{try{Process.Start(new ProcessStartInfo {FileName=AppContext.BaseDirectory,UseShellExecute=true});}catch(Exception ex){MessageBox.Show(w,SafeError(ex),"フォルダを開けません");}}));
-  panel.Children.Add(ButtonOf("閉じる",()=>w.Close()));w.ShowDialog();
+  panel.Children.Add(ButtonOf("閉じる",()=>w.Close()));ShowDialogLayout(w);
  }
  // Restore only unsaved local changes. Requests already accepted by Kimai are never undone here.
  internal static void RollbackPending(State data) {
@@ -62,7 +62,7 @@ public partial class Blocks {
   if(testError!=null){testError(message);return false;}
   var w=new Window {Title="保存失敗",Owner=progressWindow??this,Width=560,SizeToContent=SizeToContent.Height,ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterOwner};
   var panel=new StackPanel {Margin=new Thickness(20)};w.Content=panel;var text=Label(message+"\n未保存変更を破棄するとローカル編集をキャンセルします。送信済みの変更はサーバーに残る場合があります。",13);text.TextWrapping=TextWrapping.Wrap;panel.Children.Add(text);
-  bool discard=false;panel.Children.Add(ButtonOf("変更を保持して戻る",()=>w.Close()));panel.Children.Add(ButtonOf("未保存変更を破棄…",()=>{if(MessageBox.Show(w,"残っている未保存変更をすべて破棄しますか？この操作は取り消せません。","変更の破棄",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)==MessageBoxResult.Yes){discard=true;w.Close();}}));w.ShowDialog();
+  bool discard=false;panel.Children.Add(ButtonOf("変更を保持して戻る",()=>w.Close()));panel.Children.Add(ButtonOf("未保存変更を破棄…",()=>{if(MessageBox.Show(w,"残っている未保存変更をすべて破棄しますか？この操作は取り消せません。","変更の破棄",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)==MessageBoxResult.Yes){discard=true;w.Close();}}));ShowDialogLayout(w);
   if(!discard)return false;
   var oldEntries=state.Entries.ToList();var oldPending=state.Pending.ToList();bool committed=false;
   try {RollbackPending(state);Persist();ClearHistory();committed=true;needsRefresh=true;savePaused=true;if(file!=null)File.Delete(file+".bak");Render();status.Text="未保存変更を破棄しました。再読込してください。";return true;}

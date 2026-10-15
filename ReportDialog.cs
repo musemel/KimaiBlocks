@@ -75,6 +75,6 @@ public partial class Blocks {
   extra.Children.Add(ButtonOf("明細のプロジェクト…",async()=>{if(loading||loadedSnapshot==null)return;if(ChooseReportProjects(w,projectIds,out var chosen)){projectIds=chosen;await RebuildTables();tabs.SelectedIndex=tabs.Items.Count-1;}}));
   extra.Children.Add(ButtonOf("選択中の表をCSV出力…",()=>{if(!loading&&tabs.SelectedItem is TabItem tab&&tab.Tag is DataTable table)ExportReportCsv(w,table);}));
   extra.Children.Add(ButtonOf("プロジェクト別・複数期間の集計…",()=>{if(!loading)ShowPeriodReports(w);}));
-  w.ShowDialog();
+  LimitDialogHeader(w,root,top);ShowDialogLayout(w);
  }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
@@ -167,9 +167,9 @@ public partial class Blocks : Window {
   if(!CanEdit(en))return;Entry before=en.Copy();
   var w=new Window {Title="実績を編集",Width=380,Height=570,Owner=this,WindowStartupLocation=WindowStartupLocation.CenterOwner,ResizeMode=ResizeMode.NoResize};var panel=new StackPanel {Margin=new Thickness(22)};w.Content=panel;
   var project=new ProjectSearchBox(Projects,en.Project,Matches);var activity=new ComboBox {ItemsSource=ActivitiesFor(en.Project),SelectedItem=en.Activity};var date=new DatePicker {SelectedDate=en.Start.Date};var start=new TextBox {Text=en.Start.ToString("HH:mm")};var minutes=new TextBox {Text=en.Minutes.ToString()};var note=new TextBox {Text=en.Note,Height=65,AcceptsReturn=true,TextWrapping=TextWrapping.Wrap,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
-  project.SelectionChanged+=(s,e)=>{activity.ItemsSource=ActivitiesFor((string)project.SelectedItem);activity.SelectedIndex=0;};
+  project.SelectionChanged+=(s,e)=>{if(project.SelectedItem is not string name)return;var previous=activity.SelectedItem as string;var available=ActivitiesFor(name);activity.ItemsSource=available;activity.SelectedItem=available.Contains(previous)?previous:available.FirstOrDefault();};
   string[] labels={"プロジェクト","アクティビティ","日付（未来も入力できます）","開始時刻 HH:mm","時間（分・5分単位）","コメント"};Control[] fields={project,activity,date,start,minutes,note};for(int i=0;i<fields.Length;i++){panel.Children.Add(Label(labels[i],12));panel.Children.Add(fields[i]);}
-  panel.Children.Add(ButtonOf("保存",async()=>{TimeSpan t;int m;if(project.SelectedItem==null||activity.SelectedItem==null||!date.SelectedDate.HasValue||!TimeSpan.TryParse(start.Text,out t)||!int.TryParse(minutes.Text,out m)||!ValidTime(t,m)){MessageBox.Show(w,"時刻と時間は5分単位で、終了は当日24:00までに設定してください。");return;}var desired=en.Copy();desired.Project=(string)project.SelectedItem;desired.Activity=(string)activity.SelectedItem;desired.Start=date.SelectedDate.Value.Date+t;desired.Minutes=m;desired.Note=note.Text;if(!AssignIds(desired))return;RestoreEntry(en,desired);w.Close();await CommitEntry(en,before);}));w.Loaded+=(s,e)=>{note.Focus();note.SelectAll();};w.ShowDialog();RestoreCalendarFocus();
+  panel.Children.Add(ButtonOf("保存",async()=>{TimeSpan t;int m;if(project.SelectedItem==null||activity.SelectedItem==null||!date.SelectedDate.HasValue||!TimeSpan.TryParse(start.Text,out t)||!int.TryParse(minutes.Text,out m)||!ValidTime(t,m)){MessageBox.Show(w,"時刻と時間は5分単位で、終了は当日24:00までに設定してください。");return;}var desired=en.Copy();desired.Project=(string)project.SelectedItem;desired.Activity=(string)activity.SelectedItem;desired.Start=date.SelectedDate.Value.Date+t;desired.Minutes=m;desired.Note=note.Text;if(!AssignIds(desired))return;RestoreEntry(en,desired);w.Close();await CommitEntry(en,before);}));w.Loaded+=(s,e)=>{note.Focus();note.SelectAll();};ShowDialogLayout(w);RestoreCalendarFocus();
  }
 }
 

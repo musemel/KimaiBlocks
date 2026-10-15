@@ -78,7 +78,7 @@ public partial class Blocks {
     w.Close();await ConnectAsync();
    }catch(Exception ex){if(w.IsVisible)MessageBox.Show(w,SafeError(ex),"設定保存失敗");else MessageBox.Show(this,SafeError(ex),"接続失敗");}
   }));
-  bottom.Children.Add(ButtonOf("キャンセル",()=>w.Close()));w.ShowDialog();
+  bottom.Children.Add(ButtonOf("キャンセル",()=>w.Close()));ShowDialogLayout(w);
  }
  AccountProfile EditAccount(Window owner,AccountProfile source) {
   var w=new Window {Title="アカウント設定",Owner=owner,Width=560,Height=590,ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterOwner};var panel=new StackPanel {Margin=new Thickness(22)};w.Content=panel;
@@ -99,7 +99,7 @@ public partial class Blocks {
     bool unchanged=tokenReadable&&normalized==source.Url&&username.Text==source.Username&&legacy.IsChecked==source.Legacy&&token.Text==oldToken;
     result=new AccountProfile {Id=source.Id,Name=name.Text.Trim(),Url=normalized,Username=username.Text.Trim(),Legacy=legacy.IsChecked==true,AllowHttp=http.IsChecked==true,UserId=unchanged?source.UserId:0,ProtectedToken=unchanged?source.ProtectedToken:PortableToken.Protect(token.Text,DataDirectory)};w.Close();
    }catch(Exception ex){MessageBox.Show(w,SafeError(ex),"入力確認");}
-  }));panel.Children.Add(ButtonOf("キャンセル",()=>w.Close()));w.ShowDialog();return result;
+  }));panel.Children.Add(ButtonOf("キャンセル",()=>w.Close()));ShowDialogLayout(w);return result;
  }
 }
 

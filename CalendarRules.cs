@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -95,7 +95,7 @@ public partial class Blocks {
    var original=settings.Calendar;
    try {updated.Intervals();updated.HolidayDates();settings.Calendar=updated;StoreSettings();Render();w.Close();}
    catch(Exception ex){settings.Calendar=original;MessageBox.Show(w,SafeError(ex),"設定を保存できません");}
-  }));w.ShowDialog();
+  }));ShowDialogLayout(w);
  }
 }
 

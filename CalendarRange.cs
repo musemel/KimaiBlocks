@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -26,7 +26,7 @@ public partial class Blocks {
   var from=new DatePicker {SelectedDate=customFrom??week,Margin=new Thickness(4)};var through=new DatePicker {SelectedDate=customThrough??week.AddDays(6),Margin=new Thickness(4)};panel.Children.Add(from);panel.Children.Add(through);
   var widthLabel=Label("",12);panel.Children.Add(widthLabel);var width=new Slider {Minimum=100,Maximum=400,Value=rangeDayWidth,TickFrequency=10,IsSnapToTickEnabled=true,Margin=new Thickness(8)};width.ValueChanged+=(s,e)=>widthLabel.Text="1日の幅: "+Math.Round(width.Value)+" px";widthLabel.Text="1日の幅: "+rangeDayWidth+" px";panel.Children.Add(width);
   var hint=Label("期間表示では土日も含む連続した日付を表示します。\n収まらない日は下の横スクロールで移動できます。\n「週」ボタンで通常表示へ戻ります。",12);hint.TextWrapping=TextWrapping.Wrap;panel.Children.Add(hint);
-  panel.Children.Add(ButtonOf("表示",async()=>{if(!from.SelectedDate.HasValue||!through.SelectedDate.HasValue||!ValidDisplayRange(from.SelectedDate.Value,through.SelectedDate.Value)){MessageBox.Show(w,"開始日から終了日までを1〜31日で指定してください。");return;}var begin=from.SelectedDate.Value.Date;var end=through.SelectedDate.Value.Date;double dayWidth=width.Value;w.Close();await ChangeRange(begin,end,dayWidth);}));panel.Children.Add(ButtonOf("キャンセル",()=>w.Close()));w.ShowDialog();
+  panel.Children.Add(ButtonOf("表示",async()=>{if(!from.SelectedDate.HasValue||!through.SelectedDate.HasValue||!ValidDisplayRange(from.SelectedDate.Value,through.SelectedDate.Value)){MessageBox.Show(w,"開始日から終了日までを1〜31日で指定してください。");return;}var begin=from.SelectedDate.Value.Date;var end=through.SelectedDate.Value.Date;double dayWidth=width.Value;w.Close();await ChangeRange(begin,end,dayWidth);}));panel.Children.Add(ButtonOf("キャンセル",()=>w.Close()));ShowDialogLayout(w);
  }
  async Task ChangeRange(DateTime from,DateTime through,double width) {
   if(!ValidDisplayRange(from,through)||communicating||!ApplyEditor())return;
@@ -72,7 +72,7 @@ public partial class Blocks {
   }
   var left=Make(0,current.AddDays(-7),previous);var right=Make(1,current,present);bool syncing=false;
   void Sync(ScrollViewer source,ScrollViewer target){if(syncing)return;syncing=true;target.ScrollToVerticalOffset(source.VerticalOffset);syncing=false;}
-  left.ScrollChanged+=(s,e)=>{if(e.VerticalChange!=0)Sync(left,right);};right.ScrollChanged+=(s,e)=>{if(e.VerticalChange!=0)Sync(right,left);};w.Loaded+=(s,e)=>{left.ScrollToVerticalOffset(8*90);right.ScrollToVerticalOffset(8*90);};w.ShowDialog();
+  left.ScrollChanged+=(s,e)=>{if(e.VerticalChange!=0)Sync(left,right);};right.ScrollChanged+=(s,e)=>{if(e.VerticalChange!=0)Sync(right,left);};w.Loaded+=(s,e)=>{left.ScrollToVerticalOffset(8*90);right.ScrollToVerticalOffset(8*90);};ShowDialogLayout(w);
  }
  bool CopyComparisonEntries(IEnumerable<Entry> source) {
   var rows=source.OrderBy(e=>e.Start).ToList();if(rows.Count==0){status.Text="先週のブロックを選択してください。";return false;}

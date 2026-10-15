@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -25,7 +25,7 @@ public partial class Blocks {
  }
  string ColorFor(string project) {if(project==null)return "#DDE6EF";if(state.FixedColors.TryGetValue(ProjectColorKey(project),out var value))return value;return projectColors.TryGetValue(project,out var color)?color:StableColors.Color(project,settings.ProjectPalette);}
  void ResetAutomaticColors(){state.AutoColors.Clear();colorSignature="";RefreshColors();Save();Populate();Render();} void ColorDialog(string selectedProject=null) {
-  var w=new Window {Title="プロジェクトの固定色",Owner=this,Width=600,Height=760,WindowStartupLocation=WindowStartupLocation.CenterOwner};var root=new DockPanel {Margin=new Thickness(16)};w.Content=root;Action refreshRows=()=>{};
+  var w=new Window {Title="プロジェクトの固定色",Owner=this,Width=600,Height=760,MinWidth=520,MinHeight=620,WindowStartupLocation=WindowStartupLocation.CenterOwner};var root=new DockPanel {Margin=new Thickness(16)};w.Content=root;Action refreshRows=()=>{};
   var automatic=new StackPanel {Margin=new Thickness(0,0,0,12)};DockPanel.SetDock(automatic,Dock.Top);root.Children.Add(automatic);
   automatic.Children.Add(Label("自動色（プロジェクト名から決定）",15));
   var palette=new ComboBox {ItemsSource=new[]{"固定16色（標準）","固定256色","無制限"},SelectedIndex=settings.ProjectPalette==16?0:settings.ProjectPalette==256?1:2,Margin=new Thickness(4)};automatic.Children.Add(palette);LockSetting(palette,"ProjectPalette");
@@ -42,7 +42,7 @@ public partial class Blocks {
   list.SelectionChanged+=(s,e)=>{if(list.SelectedValue is string p)hex.Text=ColorFor(p);};
   if(selectedProject!=null)list.SelectedValue=selectedProject;
   void Apply(bool fixedValue) {if(list.SelectedValue is not string project)return;string value=hex.Text.Trim();if(fixedValue&&(!System.Text.RegularExpressions.Regex.IsMatch(value,"^#[0-9a-fA-F]{6}$"))){MessageBox.Show(w,"#RRGGBB形式で入力してください。");return;}if(fixedValue)state.FixedColors[ProjectColorKey(project)]=value.ToUpperInvariant();else state.FixedColors.Remove(ProjectColorKey(project));colorSignature="";Save();RefreshColors();Populate();Render();Fill();}
-  bottom.Children.Add(ButtonOf("指定色で固定",()=>Apply(true)));bottom.Children.Add(ButtonOf("自動割当へ戻す",()=>Apply(false)));bottom.Children.Add(ButtonOf("閉じる",()=>w.Close()));w.ShowDialog();
+  bottom.Children.Add(ButtonOf("指定色で固定",()=>Apply(true)));bottom.Children.Add(ButtonOf("自動割当へ戻す",()=>Apply(false)));bottom.Children.Add(ButtonOf("閉じる",()=>w.Close()));ShowDialogLayout(w);
  }
 }
 
