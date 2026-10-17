@@ -12,13 +12,17 @@ public partial class Blocks {
  DateTime? rangeStart;int rangeMinutes;Border rangeVisual;
  void AddViewTools(Panel bar) {
   bar.Children.Add(new Border {Width=1,Margin=new Thickness(10,7,5,7),Background=BrushOf("#CDD7E0")});
-  ToggleButton Toggle(string text,string help,Action action){var b=new ToggleButton {Content=text,ToolTip=help,Height=30,Padding=new Thickness(9,3,9,3),Margin=new Thickness(3),Focusable=false};b.Click+=(s,e)=>action();bar.Children.Add(b);return b;}
+  ToggleButton Toggle(string text,string help,Action action){var b=new ToggleButton {Content=text,ToolTip=help,Height=30,Padding=new Thickness(9,3,9,3),Margin=new Thickness(3),Focusable=false};b.Template=ViewToggleTemplate();b.Click+=(s,e)=>action();bar.Children.Add(b);return b;}
   weekendToggle=Toggle("▦ 土日","土日の表示／非表示",ToggleWeekends);
   dayToggle=Toggle("▣ 日","選択した実績・時間範囲・日集計の日を1列で拡大表示",()=>SetDayView(true));
   weekToggle=Toggle("▥ 週","週単位で表示",async()=>{if(customFrom.HasValue)await ChangeWeek(Monday(DisplayStart));SetDayView(false);});
   bar.Children.Add(ButtonOf("期間…",SelectRange));bar.Children.Add(ButtonOf("先週と比較",async()=>await ShowPreviousWeek()));
   lockToggle=Toggle("時間外・休日の入力禁止","休日・休み時間・時間外への入力を禁止／解除（既存実績は維持）",ToggleInputLock);UpdateViewTools();
  }
+ static ControlTemplate ViewToggleTemplate()=> (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='ToggleButton'>
+ <Border x:Name='Shell' CornerRadius='13' BorderThickness='1' BorderBrush='#91A4B7' Background='#EDF2F6' Padding='{TemplateBinding Padding}'>
+ <StackPanel Orientation='Horizontal'><TextBlock x:Name='State' Text='○' Foreground='#52677B' Margin='0,0,5,0' VerticalAlignment='Center'/><ContentPresenter x:Name='Caption' VerticalAlignment='Center'/></StackPanel></Border>
+ <ControlTemplate.Triggers><Trigger Property='IsChecked' Value='True'><Setter TargetName='Shell' Property='Background' Value='#D6EAFE'/><Setter TargetName='Shell' Property='BorderBrush' Value='#1971C2'/><Setter TargetName='State' Property='Text' Value='✓'/><Setter Property='Foreground' Value='#125A9C'/><Setter Property='FontWeight' Value='SemiBold'/></Trigger><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='Shell' Property='BorderBrush' Value='#1971C2'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter TargetName='Shell' Property='Opacity' Value='0.45'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
  void UpdateViewTools(){if(weekendToggle==null)return;weekendToggle.IsChecked=settings.ShowWeekends;dayToggle.IsChecked=dayView;weekToggle.IsChecked=!dayView&&!customFrom.HasValue;lockToggle.IsChecked=Rules.BlockInput;LockSetting(weekendToggle,"ShowWeekends");LockSetting(lockToggle,"Calendar.BlockInput");}
  void ToggleWeekends(){if(Locked("ShowWeekends")||!ApplyEditor())return;settings.ShowWeekends=!settings.ShowWeekends;rangeStart=null;SaveViewPreferences();Render();UpdateViewTools();}
  void ToggleInputLock(){if(Locked("Calendar.BlockInput")||!ApplyEditor())return;Rules.BlockInput=!Rules.BlockInput;SaveViewPreferences();Render();UpdateViewTools();}

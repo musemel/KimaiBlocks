@@ -21,7 +21,7 @@ public partial class Blocks {
   workTabs.Items.Add(new TabItem {Header="作業",Content=work});
   DockPanel Page(ListBox list,bool templates) {
    var panel=new DockPanel();var tools=new StackPanel {Margin=new Thickness(6)};DockPanel.SetDock(tools,Dock.Top);panel.Children.Add(tools);
-   var hint=Label(templates?"繰り返す入力を登録して再利用\nカレンダーへドラッグして配置":"最近使った入力（最大100件）\nコメントと長さを含めてドラッグ",11);hint.TextWrapping=TextWrapping.Wrap;tools.Children.Add(hint);
+   var hint=Label(templates?"ドラッグで並べ替え（上半分／下半分へ）\nカレンダーへドラッグすると実績を配置":"最近使った入力（最大100件）\nコメントと長さを含めてドラッグ",11);hint.TextWrapping=TextWrapping.Wrap;tools.Children.Add(hint);
    var query=new TextBox {Margin=new Thickness(4),Padding=new Thickness(6),ToolTip="プロジェクト・作業・コメント・名前で検索"};tools.Children.Add(query);query.TextChanged+=(s,e)=>RefreshReuseList(list,templates,query.Text);list.Tag=query;
    if(templates)tools.Children.Add(ButtonOf("選択中の実績を登録…",()=>{if(ApplyEditor()&&SelectedEntries().Count==1)SaveTemplate(SelectedEntries()[0]);else status.Text="登録する実績を1件選択してください。";}));
    else tools.Children.Add(ButtonOf("履歴を消去",()=>{if(MessageBox.Show(this,"入力履歴を消去しますか？実績と定型入力は残ります。","履歴の消去",MessageBoxButton.YesNo)==MessageBoxResult.Yes){state.InputHistory.Clear();Save();RefreshReuse();}}));
@@ -54,11 +54,23 @@ public partial class Blocks {
    var value=item.Value;var panel=new StackPanel();var title=Label(string.IsNullOrEmpty(item.Name)?value.Project:item.Name,12);title.FontWeight=FontWeights.SemiBold;title.TextTrimming=TextTrimming.CharacterEllipsis;panel.Children.Add(title);
    var note=Label((string.IsNullOrWhiteSpace(value.Note)?"（コメントなし）":value.Note.Replace("\r","").Replace("\n"," "))+"\n"+value.Activity+" · "+Hours(value.Minutes),11);note.TextTrimming=TextTrimming.CharacterEllipsis;panel.Children.Add(note);
    var card=new Border {Child=panel,Background=BrushOf("#F3F6FA"),BorderBrush=BrushOf(ColorFor(value.Project)),BorderThickness=new Thickness(3,0,0,0),Margin=new Thickness(2),Cursor=Cursors.Hand,ToolTip=value.Project+"\n"+value.Activity+"\n"+value.Note+"\n"+Hours(value.Minutes)+" · ドラッグして配置"};
-   DragSource(card,"saved-input",System.Text.Json.JsonSerializer.Serialize(value,new System.Text.Json.JsonSerializerOptions {IncludeFields=true}),DragDropEffects.Copy);
+   DragSource(card,"saved-input",System.Text.Json.JsonSerializer.Serialize(value,new System.Text.Json.JsonSerializerOptions {IncludeFields=true}),templates?DragDropEffects.Copy|DragDropEffects.Move:DragDropEffects.Copy,templates?item:null);
+   if(templates)TemplateDropTarget(card,item);
    var menu=new ContextMenu();var save=new MenuItem {Header=templates?"名前を変更…":"定型入力に登録…"};save.Click+=(s,e)=>SaveTemplate(value,templates?item:null);menu.Items.Add(save);
    var remove=new MenuItem {Header=templates?"定型入力を削除":"履歴から削除"};remove.Click+=(s,e)=>{if(templates)state.InputTemplates.Remove(item);else state.InputHistory.Remove(value);Save();RefreshReuse();};menu.Items.Add(remove);card.ContextMenu=menu;list.Items.Add(new ListBoxItem {Content=card});
   }
   if(list.Items.Count==0)list.Items.Add(new ListBoxItem {Content="該当する入力はありません",IsEnabled=false});
+ }
+ void MoveTemplate(SavedInput source,SavedInput target,bool after){
+  if(source==target||!state.InputTemplates.Contains(source)||!state.InputTemplates.Contains(target))return;
+  var previous=state.InputTemplates.ToList();state.InputTemplates.Remove(source);state.InputTemplates.Insert(state.InputTemplates.IndexOf(target)+(after?1:0),source);
+  try{Persist();RefreshReuse();status.Text="定型入力の順番を保存しました。";}catch(Exception ex){state.InputTemplates=previous;RefreshReuse();MessageBox.Show(this,SafeError(ex),"並べ替えを保存できません");}
+ }
+ void TemplateDropTarget(Border card,SavedInput target){
+  card.AllowDrop=true;var normal=card.BorderBrush;
+  void Clear(){card.BorderBrush=normal;card.BorderThickness=new Thickness(3,0,0,0);}
+  card.DragOver+=(s,e)=>{var source=e.Data.GetDataPresent("template-order")?e.Data.GetData("template-order") as SavedInput:null;bool valid=source!=null&&source!=target&&state.InputTemplates.Contains(source);e.Effects=valid?DragDropEffects.Move:DragDropEffects.None;e.Handled=true;if(valid){bool after=e.GetPosition(card).Y>=card.ActualHeight/2;card.BorderBrush=BrushOf("#1971C2");card.BorderThickness=new Thickness(3,after?0:3,0,after?3:0);}else Clear();};
+  card.DragLeave+=(s,e)=>Clear();card.Drop+=(s,e)=>{e.Handled=true;bool after=e.GetPosition(card).Y>=card.ActualHeight/2;Clear();if(e.Data.GetDataPresent("template-order")&&e.Data.GetData("template-order") is SavedInput source)MoveTemplate(source,target,after);};
  }
  void SaveTemplate(Entry source,SavedInput existing=null) {
   var w=new Window {Title="定型入力を登録",Owner=this,Width=440,SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner};var panel=new StackPanel {Margin=new Thickness(18)};w.Content=panel;

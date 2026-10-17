@@ -123,7 +123,7 @@ public partial class Blocks {
  TreeViewItem PathParent(TreeViewItem parent,IEnumerable<string> parts,string prefix) {
   string path=prefix;foreach(var part in parts){path+="/"+part;var child=parent.Items.OfType<TreeViewItem>().FirstOrDefault(n=>n.Tag as string==path);if(child==null){child=Node(part,path,false);child.Tag=path;if(prefix.StartsWith("activity-regex:")){var label=(TextBlock)child.Header;label.FontWeight=FontWeights.SemiBold;label.Foreground=BrushOf("#38546F");label.Margin=new Thickness(4,8,4,3);}parent.Items.Add(child);}parent=child;}return parent;
  }
- void DragSource(FrameworkElement element,string format,string value,DragDropEffects effects) {
+ void DragSource(FrameworkElement element,string format,string value,DragDropEffects effects,SavedInput template=null) {
   Point start=new Point();bool pressed=false;
   element.PreviewMouseLeftButtonDown+=(s,e)=>{start=e.GetPosition(this);pressed=true;element.CaptureMouse();e.Handled=true;};
   element.PreviewMouseLeftButtonUp+=(s,e)=>{pressed=false;if(element.IsMouseCaptured)element.ReleaseMouseCapture();};
@@ -134,7 +134,7 @@ public partial class Blocks {
    if(Math.Abs(delta.X)<SystemParameters.MinimumHorizontalDragDistance&&Math.Abs(delta.Y)<SystemParameters.MinimumVerticalDragDistance)return;
    pressed=false;element.ReleaseMouseCapture();
    status.Text=format=="project"?"フォルダへ移動、またはカレンダーでアクティビティを選んで配置":"カレンダーにドロップして実績を作成";
-   DragDrop.DoDragDrop(element,new DataObject(format,value),effects);
+   var data=new DataObject(format,value);if(template!=null)data.SetData("template-order",template);DragDrop.DoDragDrop(element,data,effects);
   };
  }
  static void SidebarTests() {
