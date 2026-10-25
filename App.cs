@@ -76,7 +76,7 @@ public partial class Blocks : Window {
  State state; DateTime week; Canvas board = new Canvas {Background=Brushes.Transparent}; Grid headers = new Grid();
  TextBox search = new TextBox(); CheckBox favorites = new CheckBox();
  TextBlock period = new TextBlock(), total = new TextBlock(), status = new TextBlock();
- ScrollViewer calendarScroll; Entry selected; bool busy; const int SlotMinutes = 5; static double Hour = 144; const double Gutter = 58;
+ ScrollViewer calendarScroll; Entry selected; bool busy; int SlotMinutes => settings.InputIntervalMinutes; static double Hour = 144; const double Gutter = 58;
  string file = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KimaiBlocks", "state.json");
  Brush Ink = new SolidColorBrush(Color.FromRgb(32, 49, 68));
  [STAThread] public static void Main(string[] args) {
@@ -86,10 +86,10 @@ public partial class Blocks : Window {
   new Application().Run(new Blocks());
  }
  static DateTime Monday(DateTime d) { return d.Date.AddDays(-((int)d.DayOfWeek+6)%7); }
- static int RoundDelta(double m) { return (int)Math.Round(m/SlotMinutes, MidpointRounding.AwayFromZero)*SlotMinutes; }
+ static int RoundDelta(double m,int SlotMinutes=5) { return (int)Math.Round(m/SlotMinutes, MidpointRounding.AwayFromZero)*SlotMinutes; }
  static int Snap(double m) { return Math.Max(0,RoundDelta(m)); }
- static int ResizeDuration(int start, int duration, int delta) { return Math.Max(SlotMinutes,Math.Min(1440-start,duration+delta)); }
- static bool ValidTime(TimeSpan time, int duration) { return time.TotalMinutes>=0 && time.TotalMinutes<1440 && time.Ticks%TimeSpan.FromMinutes(SlotMinutes).Ticks==0 && duration>=SlotMinutes && duration%SlotMinutes==0 && time.TotalMinutes+duration<=1440; }
+ static int ResizeDuration(int start, int duration, int delta,int SlotMinutes=5) { return Math.Min(1440-start,Math.Max(Math.Min(duration,SlotMinutes),duration+delta)); }
+ static bool ValidTime(TimeSpan time, int duration) { return time.TotalMinutes>=0 && time.TotalMinutes<1440 && time.Ticks%TimeSpan.FromMinutes(5).Ticks==0 && duration>=5 && duration%5==0 && time.TotalMinutes+duration<=1440; }
  static int HitMode(double y, double height) { double grip=Math.Min(6,height/4); return y<grip?1:y>height-grip?2:0; }
  Brush BrushOf(string c) { return (Brush)new BrushConverter().ConvertFromString(c); }
  Button ButtonOf(string text, Action action) { var b=new Button { Content=text, Padding=new Thickness(12,7,12,7), Margin=new Thickness(3), Background=Brushes.White, BorderBrush=BrushOf("#DCE3EA"), Cursor=Cursors.Hand }; b.Click+=(s,e)=>action(); return b; }
@@ -144,7 +144,7 @@ public partial class Blocks : Window {
    UpdateCalendarWidth();RefreshColors();entryBoxes.Clear();
    board.Children.Clear(); headers.Children.Clear(); headers.ColumnDefinitions.Clear();headers.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(Gutter)});
    period.Text=dayView?DisplayStart.ToString("yyyy/M/d (ddd)"):(customFrom??week).ToString("yyyy/M/d")+" – "+(customThrough??week.AddDays(6)).ToString("M/d");
-   var entries=VisibleEntries();RenderStatistics(entries);total.Text=(customFrom.HasValue?"期間合計  ":"週合計  ")+(entries.Where(x=>!customFrom.HasValue||x.Start>=customFrom.Value&&x.Start<customThrough.Value.AddDays(1)).Sum(x=>x.Minutes)/60.0).ToString("0.##")+" h  ·  5分刻み";
+   var entries=VisibleEntries();RenderStatistics(entries);total.Text=(customFrom.HasValue?"期間合計  ":"週合計  ")+(entries.Where(x=>!customFrom.HasValue||x.Start>=customFrom.Value&&x.Start<customThrough.Value.AddDays(1)).Sum(x=>x.Minutes)/60.0).ToString("0.##")+" h  ·  "+SlotMinutes+"分刻み";
    DrawUnavailable();
    for(int d=0;d<DisplayDayCount;d++) {headers.ColumnDefinitions.Add(new ColumnDefinition());var h=Label(DisplayStart.AddDays(d).ToString("M/d (ddd)"),14);h.HorizontalAlignment=HorizontalAlignment.Center;if(DisplayStart.AddDays(d)==DateTime.Today)h.Foreground=BrushOf("#1971C2");DateTime headerDay=DisplayStart.AddDays(d);h.Cursor=Cursors.Hand;h.ToolTip="この日の統計を表示";h.MouseLeftButtonDown+=(s,e)=>{statisticsDay=headerDay;SetStatisticsVisible(true);statisticsTabs.SelectedIndex=1;RenderStatistics(VisibleEntries());};Grid.SetColumn(h,d+1);headers.Children.Add(h);var line=new Border{Width=1,Height=board.Height,Background=BrushOf("#E8EDF2")};Canvas.SetLeft(line,Gutter+d*DayWidth);board.Children.Add(line);}
    for(int h=0;h<24;h++) {var line=new Border {Height=1,Width=DisplayDayCount*DayWidth,Background=BrushOf("#E8EDF2")};Canvas.SetLeft(line,Gutter);Canvas.SetTop(line,h*Hour);board.Children.Add(line);}
@@ -157,7 +157,7 @@ public partial class Blocks : Window {
  async void DropWork(object sender,DragEventArgs e) {
   if(!CanEdit()||!ApplyEditor())return;var pos=e.GetPosition(board);if(pos.X<Gutter)return;
   bool useRange=DropWithinSelection(pos);var work=ResolveDroppedWork(e.Data);if(work==null)return;e.Handled=true;
-  int d=Math.Clamp((int)((pos.X-Gutter)/DayWidth),0,DisplayDayCount-1);int minute=CellMinute(pos.Y/Hour*60);
+  int d=Math.Clamp((int)((pos.X-Gutter)/DayWidth),0,DisplayDayCount-1);int minute=CellMinute(pos.Y/Hour*60,SlotMinutes);
   var en=new Entry {Project=work[0],Activity=work[1],Start=useRange?rangeStart.Value:DisplayStart.AddDays(d).AddMinutes(minute),Minutes=useRange?rangeMinutes:Math.Min(60,1440-minute)};
   var reusable=DroppedInput(e.Data);if(reusable!=null){en.Note=reusable.Note;en.Minutes=useRange?rangeMinutes:Math.Min(reusable.Minutes,1440-minute);}
   if(!AssignIds(en))return;await FinishBlockDrag(null,null,en,true,0);rangeStart=null;Render();

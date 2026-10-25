@@ -17,6 +17,7 @@ public static class SettingsLayers {
   if(value.Calendar==null||value.Accounts==null||value.ExcludedReportUserIds==null||value.PeriodReport==null)throw new ArgumentException("Calendar / Accounts / ExcludedReportUserIds / PeriodReport にnullは指定できません。");
   if(value.Calendar.DaysOff==null||value.Calendar.DaysOff.Any(d=>d<0||d>6)||value.ExcludedReportUserIds.Any(id=>id<=0))throw new ArgumentException("曜日は0〜6、除外ユーザーIDは正の整数で指定してください。");value.PeriodReport.Validate();value.Calendar.Intervals();value.Calendar.HolidayDates();_ = new ActivityGrouping(value.ActivityGroupingPattern);
   if(value.SaveSeconds<10||value.SaveSeconds>3600||value.CatalogMinutes<1||value.CatalogMinutes>1440||!new[]{0,16,256}.Contains(value.ProjectPalette)||value.ZoomPercent<50||value.ZoomPercent>400||value.ReportMinimumHours<0||value.ReportMinimumHours>24)throw new ArgumentException("設定値が許容範囲外です。保存間隔10〜3600秒、キャッシュ1〜1440分、倍率50〜400%、基準時間0〜24時間で指定してください。");
+  if(!new[]{5,10,15,20,25,30}.Contains(value.InputIntervalMinutes))throw new ArgumentException("入力間隔は5・10・15・20・25・30分から指定してください。");
   return value;
  }
 }

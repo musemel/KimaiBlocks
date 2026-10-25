@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -19,7 +19,7 @@ public partial class Blocks {
  }
  internal static int TimeLabelStep(double hour)=>new[]{5,10,15,30,60}.First(step=>step*hour/60>=20);
  void DrawTimeLabels() {
-  int step=TimeLabelStep(Hour);for(int minute=0;minute<1440;minute+=step){var label=Label($"{minute/60:00}:{minute%60:00}",minute%60==0?11:10);label.FontWeight=minute%60==0?FontWeights.SemiBold:FontWeights.Normal;label.Foreground=BrushOf(minute%60==0?"#30485E":"#718394");label.Margin=new Thickness(4,0,0,0);label.IsHitTestVisible=false;Canvas.SetTop(label,Math.Max(0,minute/60.0*Hour-6));board.Children.Add(label);}
+  int step=SlotMinutes*(int)Math.Ceiling(20*60/(Hour*SlotMinutes));for(int minute=0;minute<1440;minute+=step){var label=Label($"{minute/60:00}:{minute%60:00}",minute%60==0?11:10);label.FontWeight=minute%60==0?FontWeights.SemiBold:FontWeights.Normal;label.Foreground=BrushOf(minute%60==0?"#30485E":"#718394");label.Margin=new Thickness(4,0,0,0);label.IsHitTestVisible=false;Canvas.SetTop(label,Math.Max(0,minute/60.0*Hour-6));board.Children.Add(label);}
  }
  void AddSelectedCommentTotals(StackPanel panel,List<Entry> selectedRows) {
   var entries=VisibleEntries();foreach(var group in selectedRows.GroupBy(e=>(e.Project,Comment:CommentStatistics.Key(e),Day:e.Start.Date)).Take(6)){

@@ -20,6 +20,7 @@ using System.Windows.Threading;
  [DataMember] public bool Attempted;
 }
 public sealed class ConnectionSettings {
+ public int InputIntervalMinutes {get;set;}=5;
  public System.Collections.Generic.List<int> ExcludedReportUserIds {get;set;}=new System.Collections.Generic.List<int>();
  public decimal ReportMinimumHours {get;set;}=8;
  public PeriodReportConfig PeriodReport {get;set;}=new PeriodReportConfig();

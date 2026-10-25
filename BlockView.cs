@@ -37,8 +37,8 @@ public partial class Blocks {
    box.Cursor=HitMode(e.GetPosition(box).Y,box.Height)!=0?Cursors.SizeNS:Cursors.SizeAll;
    if(!box.IsMouseCaptured||e.LeftButton!=MouseButtonState.Pressed)return;var p=e.GetPosition(board);if((p-origin).Length<4&&!moved)return;
    if(!moved){selectedKeys.Add(EditingModel.Key(en));originals=SelectedEntries();if(originals.Count==0)originals=new List<Entry>{en};if(originals.Any(r=>r.ReadOnlyReason!=null)){dragActive=false;box.ReleaseMouseCapture();return;}moved=true;RefreshSelection();}
-   int delta=RoundDelta((p.Y-origin.Y)/Hour*60);int dayDelta=Math.Clamp((int)((p.X-Gutter)/DayWidth),0,DisplayDayCount-1)-day;
-   desired=originals.Select(row=>{var d=row.Copy();if(mode==0)d.Start=row.Start.AddDays(dayDelta).AddMinutes(delta);else if(mode==1){int shift=Math.Clamp(delta,-(int)row.Start.TimeOfDay.TotalMinutes,row.Minutes-5);d.Start=row.Start.AddMinutes(shift);d.Minutes=row.Minutes-shift;}else d.Minutes=ResizeDuration((int)row.Start.TimeOfDay.TotalMinutes,row.Minutes,delta);return d;}).ToList();
+   double edge=en.Start.TimeOfDay.TotalMinutes+(mode==2?en.Minutes:0);int delta=DragGridDelta(edge,(p.Y-origin.Y)/Hour*60,SlotMinutes);int dayDelta=Math.Clamp((int)((p.X-Gutter)/DayWidth),0,DisplayDayCount-1)-day;
+   desired=originals.Select(row=>{var d=row.Copy();if(mode==0)d.Start=row.Start.AddDays(dayDelta).AddMinutes(delta);else if(mode==1){int shift=Math.Clamp(delta,-(int)row.Start.TimeOfDay.TotalMinutes,row.Minutes-Math.Min(row.Minutes,SlotMinutes));d.Start=row.Start.AddMinutes(shift);d.Minutes=row.Minutes-shift;}else d.Minutes=ResizeDuration((int)row.Start.TimeOfDay.TotalMinutes,row.Minutes,delta,SlotMinutes);return d;}).ToList();
    ClearGhosts();
    for(int i=0;i<desired.Count;i++){var d=desired[i];var ghost=EntryVisual(d,DayWidth-9,true);Canvas.SetLeft(ghost,Gutter+(d.Start.Date-DisplayStart).Days*DayWidth+3);Canvas.SetTop(ghost,d.Start.TimeOfDay.TotalHours*Hour);Panel.SetZIndex(ghost,500);board.Children.Add(ghost);ghosts.Add(ghost);if(!copy&&entryBoxes.TryGetValue(originals[i],out var visual))visual.Opacity=.2;}
   };
@@ -49,6 +49,8 @@ public partial class Blocks {
   var menu=new ContextMenu();var edit=new MenuItem {Header="編集（Enter）"};edit.Click+=(s,e)=>Edit(en);menu.Items.Add(edit);var comment=new MenuItem {Header="コメント編集（F2）"};comment.Click+=(s,e)=>BeginInlineComment(en);menu.Items.Add(comment);var del=new MenuItem {Header="削除（Delete）"};del.Click+=async(s,e)=>await DeleteEntry(en);menu.Items.Add(del);box.ContextMenu=menu;
   var template=new MenuItem {Header="定型入力に登録…"};template.Click+=(s,e)=>{if(ApplyEditor())SaveTemplate(en);};menu.Items.Insert(2,template);
  }
+ // Snap the grabbed start/end to the calendar grid; keep relative offsets in a multi-selection.
+ static int DragGridDelta(double edge,double movement,int interval)=>RoundDelta(edge+movement,interval)-(int)edge;
  static Brush ReadableText(string hex){var c=(Color)ColorConverter.ConvertFromString(hex);return .2126*c.R+.7152*c.G+.0722*c.B<140?Brushes.White:Brushes.Black;}
 }
 

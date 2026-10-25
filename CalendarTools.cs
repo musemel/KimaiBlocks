@@ -32,9 +32,10 @@ public partial class Blocks {
  void ViewSettingsDialog() {
   var w=new Window {Title="表示・作業ツリー",Owner=this,Width=540,SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner};var panel=new StackPanel {Margin=new Thickness(20)};w.Content=panel;
   var weekends=new CheckBox {Content="土日を表示",IsChecked=settings.ShowWeekends,Margin=new Thickness(4,8,4,12)};panel.Children.Add(weekends);LockSetting(weekends,"ShowWeekends");
+  panel.Children.Add(Label("入力間隔（分）",13));var interval=new ComboBox {ItemsSource=new[]{5,10,15,20,25,30},SelectedItem=SlotMinutes,Margin=new Thickness(4),Padding=new Thickness(6)};panel.Children.Add(interval);LockSetting(interval,"InputIntervalMinutes");panel.Children.Add(Label("時間枠の線・範囲選択・ドラッグの移動量に適用します。\n既存実績は維持し、時刻の直接入力は5分単位で利用できます。",12));
   panel.Children.Add(Label("アクティビティの分類（正規表現、空欄で無効）",13));var pattern=new TextBox {Text=EffectiveActivityPattern,IsReadOnly=managedSettings.ActivityGroupingPattern!=null,ToolTip=managedSettings.ActivityGroupingPattern!=null?"settings.override.jsonで管理されています":null,Margin=new Thickness(4),Padding=new Thickness(6)};panel.Children.Add(pattern);LockSetting(pattern,"ActivityGroupingPattern");
   var help=Label("例: (.*)/(.*) → $1でまとめ、$2を子項目に表示。\n一致しない項目は元の名前で表示します。",12);help.TextWrapping=TextWrapping.Wrap;panel.Children.Add(help);
-  panel.Children.Add(ButtonOf("保存",()=>{try{_ = new ActivityGrouping(pattern.Text);var previous=settings.ActivityGroupingPattern;bool old=settings.ShowWeekends;if(managedSettings.ActivityGroupingPattern==null)settings.ActivityGroupingPattern=pattern.Text;settings.ShowWeekends=weekends.IsChecked==true;try{StoreSettings();}catch{settings.ActivityGroupingPattern=previous;settings.ShowWeekends=old;throw;}rangeStart=null;Populate();Render();Save();UpdateViewTools();w.Close();}catch(Exception ex){MessageBox.Show(w,SafeError(ex),"設定を保存できません");}}));panel.Children.Add(ButtonOf("キャンセル",()=>w.Close()));ShowDialogLayout(w);
+  panel.Children.Add(ButtonOf("保存",()=>{try{_ = new ActivityGrouping(pattern.Text);var previous=settings.ActivityGroupingPattern;bool old=settings.ShowWeekends;int oldInterval=SlotMinutes;if(managedSettings.ActivityGroupingPattern==null)settings.ActivityGroupingPattern=pattern.Text;settings.ShowWeekends=weekends.IsChecked==true;settings.InputIntervalMinutes=(int)interval.SelectedItem;try{StoreSettings();}catch{settings.ActivityGroupingPattern=previous;settings.ShowWeekends=old;settings.InputIntervalMinutes=oldInterval;throw;}rangeStart=null;Populate();Render();Save();UpdateViewTools();w.Close();}catch(Exception ex){MessageBox.Show(w,SafeError(ex),"設定を保存できません");}}));panel.Children.Add(ButtonOf("キャンセル",()=>w.Close()));ShowDialogLayout(w);
  }
  void SyncSettingsDialog() {
   var w=new Window {Title="自動保存・キャッシュ・更新先",Owner=this,Width=540,SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner};var panel=new StackPanel {Margin=new Thickness(20)};w.Content=panel;
@@ -43,15 +44,15 @@ public partial class Blocks {
   panel.Children.Add(ButtonOf("保存",()=>{if(!int.TryParse(seconds.Text,out var sec)||sec<10||sec>3600||!int.TryParse(minutes.Text,out var min)||min<1||min>1440){MessageBox.Show(w,"保存間隔とキャッシュ期間を範囲内で指定してください。");return;}var old=settings;try{var updated=System.Text.Json.JsonSerializer.Deserialize<ConnectionSettings>(System.Text.Json.JsonSerializer.Serialize(settings));updated.SaveSeconds=sec;updated.CatalogMinutes=min;if(managedSettings.UpdateFolder==null)updated.UpdateFolder=folder.Text.Trim();settings=updated;try{StoreSettings();}catch{settings=old;throw;}saveTimer.Interval=TimeSpan.FromSeconds(sec);w.Close();}catch(Exception ex){MessageBox.Show(w,SafeError(ex),"設定を保存できません");}}));panel.Children.Add(ButtonOf("キャンセル",()=>w.Close()));ShowDialogLayout(w);
  }
  // Absolute pointer positions belong to the containing cell, not the nearest boundary.
- static int CellMinute(double minutes)=>Math.Clamp((int)Math.Floor(minutes/SlotMinutes)*SlotMinutes,0,1440-SlotMinutes);
+ static int CellMinute(double minutes,int SlotMinutes=5)=>Math.Clamp((int)Math.Floor(minutes/SlotMinutes)*SlotMinutes,0,1439/SlotMinutes*SlotMinutes);
  void SelectCellRange(DateTime anchor,double pointerMinutes) {
-  int begin=CellMinute(anchor.TimeOfDay.TotalMinutes),end=CellMinute(pointerMinutes);
-  rangeStart=anchor.Date.AddMinutes(Math.Min(begin,end));rangeMinutes=Math.Abs(end-begin)+SlotMinutes;pasteTime=rangeStart;
+  int begin=CellMinute(anchor.TimeOfDay.TotalMinutes,SlotMinutes),end=CellMinute(pointerMinutes,SlotMinutes);
+  rangeStart=anchor.Date.AddMinutes(Math.Min(begin,end));rangeMinutes=Math.Min(1440-Math.Min(begin,end),Math.Abs(end-begin)+SlotMinutes);pasteTime=rangeStart;
   DrawSelectedRange();status.Text=rangeStart.Value.ToString("M/d HH:mm")+" – "+rangeStart.Value.AddMinutes(rangeMinutes).ToString("HH:mm")+"：作業または親項目をドラッグして配置";
  }
  void SetupRangeSelection() {
   DateTime anchor=default;bool selecting=false;
-  board.MouseLeftButtonDown+=(s,e)=>{if(e.Handled||!ApplyEditor())return;var p=e.GetPosition(board);if(p.X<Gutter)return;int d=Math.Clamp((int)((p.X-Gutter)/DayWidth),0,DisplayDayCount-1);anchor=DisplayStart.AddDays(d).AddMinutes(CellMinute(p.Y/Hour*60));
+  board.MouseLeftButtonDown+=(s,e)=>{if(e.Handled||!ApplyEditor())return;var p=e.GetPosition(board);if(p.X<Gutter)return;int d=Math.Clamp((int)((p.X-Gutter)/DayWidth),0,DisplayDayCount-1);anchor=DisplayStart.AddDays(d).AddMinutes(CellMinute(p.Y/Hour*60,SlotMinutes));
    if(!Keyboard.Modifiers.HasFlag(ModifierKeys.Control)&&!Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)){selectedKeys.Clear();selected=null;RefreshSelection();}selecting=true;board.CaptureMouse();board.Focus();SelectCellRange(anchor,anchor.TimeOfDay.TotalMinutes);e.Handled=true;};
   board.MouseMove+=(s,e)=>{if(!selecting||e.LeftButton!=MouseButtonState.Pressed)return;SelectCellRange(anchor,e.GetPosition(board).Y/Hour*60);};
   board.MouseLeftButtonUp+=(s,e)=>{if(selecting){selecting=false;board.ReleaseMouseCapture();e.Handled=true;}};board.LostMouseCapture+=(s,e)=>selecting=false;

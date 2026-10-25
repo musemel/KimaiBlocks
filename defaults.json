@@ -1,4 +1,5 @@
 ﻿{
+  "InputIntervalMinutes": 5,
   "ProjectPalette": 16,
   "AvoidColorCollisions": false,
   "ActivityGroupingPattern": "(.*)/(.*)",

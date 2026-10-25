@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.IO;
@@ -16,6 +16,27 @@ public partial class Blocks {
   Projects=new[]{"A","B","C","D"};var w=new Blocks(true);w.file=Path.Combine(folder,"revision-cache.json");w.testSettingsPath=Path.Combine(folder,"revision-settings.json");w.state=new State();w.Show();
   try {
    void Check(bool condition,string message){if(!condition)throw new Exception(message);}
+   Check(485+DragGridDelta(485,15,15)==495&&485+DragGridDelta(485,30,15)==510,"Off-grid 08:05 move retained five-minute offset");
+   Check(485+DragGridDelta(485,-15,15)==465&&485+DragGridDelta(485,-5,15)==480,"Off-grid upward move did not snap");
+   Check(545+DragGridDelta(545,15,15)==555,"Resize end did not snap to grid");
+   Check(480+DragGridDelta(480,15,15)==495,"Aligned move regression");
+   foreach(int interval in new[]{5,10,15,20,25,30})Check((485+DragGridDelta(485,interval,interval))%interval==0,"Drag interval alignment");
+   foreach(int step in new[]{5,10,15,20,25,30}) {
+    w.settings.InputIntervalMinutes=step;Check(CellMinute(63,step)==60/step*step&&RoundDelta(step*.8,step)==step&&RoundDelta(-step*.8,step)==-step,"Input interval snapping");
+    w.SelectCellRange(w.week.AddMinutes(CellMinute(1439,step)),1440);Check(w.rangeStart.Value.AddMinutes(w.rangeMinutes)==w.week.AddDays(1),"Last interval exceeded midnight");
+    w.Render();Check(w.total.Text.Contains(step+"分刻み"),"Interval display not updated");
+   }
+   Check(ResizeDuration(540,5,0,30)==5,"Changing interval enlarged an existing short entry");
+   w.settings.InputIntervalMinutes=5;w.rangeStart=null;
+   Check(SettingsLayers.Load("{\"InputIntervalMinutes\":15}").InputIntervalMinutes==15,"Interval defaults");
+   var policyInterval=ManagedSettings.Read("{\"InputIntervalMinutes\":30}");Check(policyInterval.Apply(new ConnectionSettings()).InputIntervalMinutes==30&&policyInterval.Locked("InputIntervalMinutes"),"Interval override");
+   bool invalidInterval=false;try{SettingsLayers.Load("{\"InputIntervalMinutes\":7}");}catch(ArgumentException){invalidInterval=true;}Check(invalidInterval,"Invalid interval accepted");
+   w.tree.Items.Clear();for(int i=0;i<80;i++)w.tree.Items.Add(w.Node("項目 "+i,"test:"+i,false));w.UpdateLayout();
+   var treeScroll=TreeVisuals<ScrollViewer>(w.tree).First();treeScroll.ScrollToVerticalOffset(500);await Dispatcher.Yield(DispatcherPriority.ContextIdle);w.UpdateLayout();
+   var anchor=w.CaptureTreePosition();Check(anchor.Anchors.Count>0&&anchor.Offset>0,"Tree anchor missing");
+   w.tree.Items.Clear();w.tree.Items.Add(w.Node("追加されたお気に入り","new",false));for(int i=0;i<80;i++)w.tree.Items.Add(w.Node("項目 "+i,"test:"+i,false));w.RestoreTreePosition(anchor);await Dispatcher.Yield(DispatcherPriority.ContextIdle);w.UpdateLayout();
+   var restoredPosition=w.CaptureTreePosition();var firstAnchor=anchor.Anchors[0];Check(restoredPosition.Anchors.Any(a=>a.Key==firstAnchor.Key&&Math.Abs(a.Y-firstAnchor.Y)<2),"Tree item position moved after rebuild");
+   w.Populate();
    foreach(int duration in new[]{5,10,30,120}){var entry=new Entry {Project="A",Activity="設計",Note="コメント",Start=w.week.AddHours(9),Minutes=duration};var normal=w.EntryVisual(entry,160);var preview=w.EntryVisual(entry,160,true);var text=(TextBlock)normal.Child;var ghostText=(TextBlock)preview.Child;Check(text.Text==ghostText.Text&&text.FontSize==ghostText.FontSize&&text.LineHeight==ghostText.LineHeight&&text.Margin==ghostText.Margin&&text.TextTrimming==ghostText.TextTrimming&&normal.CornerRadius==preview.CornerRadius,"Drag preview text layout differs");Check(preview.Opacity==.75&&!preview.IsHitTestVisible,"Drag preview opacity/hit testing");if(duration==120)Check(text.Text.EndsWith("コメント"),"Large preview comment is not last");if(duration==5)Check(text.Text.StartsWith("A\nコメント"),"Small preview comment priority");}
    SavedInput templateA=new SavedInput {Name="A",Value=new Entry {Project="A",Activity="設計",Minutes=30,Start=new DateTime(2000,1,1)}},templateB=new SavedInput {Name="B",Value=new Entry {Project="A",Activity="設計",Minutes=30,Start=new DateTime(2000,1,1)}},templateC=new SavedInput {Name="C",Value=new Entry {Project="A",Activity="設計",Minutes=30,Start=new DateTime(2000,1,1)}};
    w.state.InputTemplates.AddRange(new[]{templateA,templateB,templateC});w.MoveTemplate(templateA,templateC,true);Check(w.state.InputTemplates.SequenceEqual(new[]{templateB,templateC,templateA}),"Template move after failed");w.MoveTemplate(templateA,templateB,false);Check(w.state.InputTemplates.SequenceEqual(new[]{templateA,templateB,templateC}),"Template move before failed");w.MoveTemplate(templateB,templateB,true);Check(w.state.InputTemplates[1]==templateB,"Self drop reordered templates");using(var saved=File.OpenRead(w.file)){var restored=(State)new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(State)).ReadObject(saved);Check(restored.InputTemplates.Select(t=>t.Name).SequenceEqual(new[]{"A","B","C"}),"Template order was not persisted");}w.state.InputTemplates.Clear();

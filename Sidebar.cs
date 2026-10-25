@@ -37,7 +37,7 @@ public partial class Blocks {
   filters.Children.Add(Label("作業項目・フォルダを検索",11));filters.Children.Add(search);var searchDelay=new System.Windows.Threading.DispatcherTimer {Interval=TimeSpan.FromMilliseconds(250)};searchDelay.Tick+=(s,e)=>{searchDelay.Stop();Populate();};search.TextChanged+=(s,e)=>{searchDelay.Stop();searchDelay.Start();};
   favorites.Content="★ お気に入りのみ";favorites.Margin=new Thickness(4,8,4,4);favorites.Click+=(s,e)=>Populate();filters.Children.Add(favorites);
   var hint=Label("右クリックでフォルダ追加・削除\nプロジェクトをフォルダへドラッグ",11);hint.Foreground=BrushOf("#63758A");filters.Children.Add(hint);
-  VirtualizingPanel.SetIsVirtualizing(tree,true);VirtualizingPanel.SetVirtualizationMode(tree,VirtualizationMode.Recycling);ScrollViewer.SetCanContentScroll(tree,true);
+  VirtualizingPanel.SetIsVirtualizing(tree,true);VirtualizingPanel.SetVirtualizationMode(tree,VirtualizationMode.Recycling);ScrollViewer.SetCanContentScroll(tree,true);VirtualizingPanel.SetScrollUnit(tree,ScrollUnit.Pixel);
   tree.BorderThickness=new Thickness(0);tree.Margin=new Thickness(4);tree.Background=Brushes.White;
   ApplyTreeGuides();BuildReuseTabs(left,filters);
  }
@@ -72,6 +72,7 @@ public partial class Blocks {
  static bool Matches(string value,string query) {string Clean(string s)=>new string((s??" ").Normalize(NormalizationForm.FormKC).Where(c=>!char.IsWhiteSpace(c)).ToArray());return System.Globalization.CultureInfo.GetCultureInfo("ja-JP").CompareInfo.IndexOf(Clean(value),Clean(query),System.Globalization.CompareOptions.IgnoreCase|System.Globalization.CompareOptions.IgnoreKanaType|System.Globalization.CompareOptions.IgnoreWidth)>=0;}
  string FolderOf(string project) {string f;return state.ProjectFolders.TryGetValue(project,out f)&&state.Folders.Contains(f)?f:null;}
  void Populate() {
+  var position=CaptureTreePosition();
   try {activityGrouping=new ActivityGrouping(EffectiveActivityPattern);}catch(ArgumentException){activityGrouping=new ActivityGrouping("");status.Text="アクティビティの正規表現が不正です。設定を確認してください。";}
   RefreshColors();rebuildingTree=true;
   try {
@@ -81,10 +82,11 @@ public partial class Blocks {
    foreach(var p in Projects.Where(p=>!state.Hidden.Contains(p)&&FolderOf(p)==null))AddProject(root,p,"");
    if(favorites.IsChecked==true&&root.Items.Count==0)tree.Items.Remove(root);
   } finally {rebuildingTree=false;}
+  RestoreTreePosition(position);
  }
  TreeViewItem Node(string title,string key,bool root) {
   var header=Label(title,12);header.Padding=new Thickness(2,3,2,3);header.ToolTip=title;
-  var node=new TreeViewItem {Header=header,IsExpanded=(root?!state.Collapsed.Contains(key):state.ExpandedNodes.Contains(key))||!string.IsNullOrWhiteSpace(search.Text)};
+  var node=new TreeViewItem {Tag=key,Header=header,IsExpanded=(root?!state.Collapsed.Contains(key):state.ExpandedNodes.Contains(key))||!string.IsNullOrWhiteSpace(search.Text)};
   node.Expanded+=(s,e)=>{if(e.OriginalSource!=node)return;if(!rebuildingTree&&string.IsNullOrWhiteSpace(search.Text)){state.Collapsed.Remove(key);if(!state.ExpandedNodes.Contains(key))state.ExpandedNodes.Add(key);Save();}};
   node.Collapsed+=(s,e)=>{if(e.OriginalSource!=node)return;if(!rebuildingTree&&string.IsNullOrWhiteSpace(search.Text)){state.ExpandedNodes.Remove(key);if(!state.Collapsed.Contains(key))state.Collapsed.Add(key);Save();}};
   header.MouseRightButtonDown+=(s,e)=>node.IsSelected=true;
@@ -118,7 +120,7 @@ public partial class Blocks {
    DragSource(name,"work",System.Text.Json.JsonSerializer.Serialize(new[]{project,activity}),DragDropEffects.Copy);
    var star=ButtonOf(state.Favorites.Contains(key)?"★":"☆",()=>{if(state.Favorites.Contains(key))state.Favorites.Remove(key);else state.Favorites.Add(key);Save();Populate();});
    star.Padding=new Thickness(3);star.Margin=new Thickness(0);star.Width=26;star.Height=22;star.FontSize=15;star.VerticalAlignment=VerticalAlignment.Center;star.Background=Brushes.Transparent;star.BorderThickness=new Thickness(0);star.Foreground=state.Favorites.Contains(key)?BrushOf("#936000"):BrushOf("#687C90");star.ToolTip="お気に入りを切り替え";Grid.SetColumn(star,1);row.Children.Add(star);
-   var leaf=new TreeViewItem {Header=card};leaf.ContextMenuOpening+=(s,e)=>e.Handled=true;activityParent.Items.Add(leaf);
+   var leaf=new TreeViewItem {Tag="work:"+key,Header=card};leaf.ContextMenuOpening+=(s,e)=>e.Handled=true;activityParent.Items.Add(leaf);
  }
  TreeViewItem PathParent(TreeViewItem parent,IEnumerable<string> parts,string prefix) {
   string path=prefix;foreach(var part in parts){path+="/"+part;var child=parent.Items.OfType<TreeViewItem>().FirstOrDefault(n=>n.Tag as string==path);if(child==null){child=Node(part,path,false);child.Tag=path;if(prefix.StartsWith("activity-regex:")){var label=(TextBlock)child.Header;label.FontWeight=FontWeights.SemiBold;label.Foreground=BrushOf("#38546F");label.Margin=new Thickness(4,8,4,3);}parent.Items.Add(child);}parent=child;}return parent;
