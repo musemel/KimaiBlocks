@@ -40,15 +40,36 @@ public partial class Blocks {
   }finally {checkingUpdates=false;}
  }
  void ShowUpdateDialog(string folder,Version available) {
-  var w=new Window {Title="アップデート",Owner=this,Width=550,SizeToContent=SizeToContent.Height,WindowStartupLocation=WindowStartupLocation.CenterOwner};
-  var panel=new StackPanel {Margin=new Thickness(20)};w.Content=panel;
-  var message=Label((available>Version.Parse(AppVersion)?"新しいバージョンがあります":"新しいバージョンはありません")+"\n現在: "+AppVersion+"\n配布版: "+available+"\n\n保存して終了後、配布フォルダの一式をコピーしてください。\nsettings.override.json がある場合は一緒にコピーしてください。",13);message.TextWrapping=TextWrapping.Wrap;panel.Children.Add(message);
-  panel.Children.Add(new TextBox {Text=folder,IsReadOnly=true,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(4,12,4,8)});
-  panel.Children.Add(ButtonOf("配布フォルダを開く",()=>{try{if(!Directory.Exists(folder))throw new IOException("配布フォルダにアクセスできません。");Process.Start(new ProcessStartInfo {FileName=Path.GetFullPath(folder),UseShellExecute=true});}catch(Exception ex){MessageBox.Show(w,SafeError(ex),"フォルダを開けません");}}));
-  panel.Children.Add(Label("実行中のEXEフォルダ",12));
-  panel.Children.Add(new TextBox {Text=AppContext.BaseDirectory,IsReadOnly=true,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(4,4,4,8)});
-  panel.Children.Add(ButtonOf("実行中のEXEフォルダを開く",()=>{try{Process.Start(new ProcessStartInfo {FileName=AppContext.BaseDirectory,UseShellExecute=true});}catch(Exception ex){MessageBox.Show(w,SafeError(ex),"フォルダを開けません");}}));
-  panel.Children.Add(ButtonOf("閉じる",()=>w.Close()));ShowDialogLayout(w);
+  var w=new Window {Title="アップデート",Owner=this,Width=760,Height=Math.Min(720,SystemParameters.WorkArea.Height-40),MinWidth=540,MinHeight=420,WindowStartupLocation=WindowStartupLocation.CenterOwner};
+  var root=new DockPanel {Margin=new Thickness(20)};w.Content=root;
+  var header=new StackPanel();DockPanel.SetDock(header,Dock.Top);root.Children.Add(header);
+  header.Children.Add(Label(available>Version.Parse(AppVersion)?"新しいバージョンがあります":"新しいバージョンはありません",17));
+  header.Children.Add(Label("現在: "+AppVersion+"    配布版: "+available,12));
+  var help=Label("保存して終了後、配布フォルダの一式をコピーしてください。\nsettings.override.json がある場合は一緒にコピーしてください。",12);help.TextWrapping=TextWrapping.Wrap;header.Children.Add(help);
+  var footer=new StackPanel {Margin=new Thickness(0,12,0,0)};DockPanel.SetDock(footer,Dock.Bottom);root.Children.Add(footer);
+  void PathRow(string label,string path){var row=new DockPanel {Margin=new Thickness(4,2,4,2)};var caption=Label(label,11);caption.Width=125;DockPanel.SetDock(caption,Dock.Left);row.Children.Add(caption);row.Children.Add(new TextBox {Text=path,IsReadOnly=true,ToolTip=path,Padding=new Thickness(4),VerticalContentAlignment=VerticalAlignment.Center});footer.Children.Add(row);}
+  PathRow("配布フォルダ",folder);PathRow("実行中のEXEフォルダ",AppContext.BaseDirectory);
+  var buttons=new WrapPanel {Margin=new Thickness(0,8,0,0)};footer.Children.Add(buttons);
+  buttons.Children.Add(ButtonOf("配布フォルダを開く",()=>{try{if(!Directory.Exists(folder))throw new IOException("配布フォルダにアクセスできません。");Process.Start(new ProcessStartInfo {FileName=Path.GetFullPath(folder),UseShellExecute=true});}catch(Exception ex){MessageBox.Show(w,SafeError(ex),"フォルダを開けません");}}));
+  buttons.Children.Add(ButtonOf("実行中のEXEフォルダを開く",()=>{try{Process.Start(new ProcessStartInfo {FileName=AppContext.BaseDirectory,UseShellExecute=true});}catch(Exception ex){MessageBox.Show(w,SafeError(ex),"フォルダを開けません");}}));
+  var close=ButtonOf("閉じる",()=>w.Close());close.IsCancel=true;buttons.Children.Add(close);
+  var body=new DockPanel {Margin=new Thickness(0,10,0,0)};root.Children.Add(body);var title=Label("更新情報（updates.txt）",13);DockPanel.SetDock(title,Dock.Top);body.Children.Add(title);
+  var notes=new TextBox {Name="UpdateNotes",Text="更新情報を読み込んでいます…",IsReadOnly=true,TextWrapping=TextWrapping.Wrap,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Margin=new Thickness(4),Padding=new Thickness(12)};body.Children.Add(notes);
+  w.Loaded+=async(s,e)=>{
+   var reading=Task.Run(()=>ReadUpdateNotes(folder));
+   string text=await Task.WhenAny(reading,Task.Delay(TimeSpan.FromSeconds(8)))==reading?await reading:"更新情報の読み込みがタイムアウトしました。";
+   if(!w.IsVisible)return;notes.Text=text==null?"配布フォルダにupdates.txtがありません。":string.IsNullOrWhiteSpace(text)?"更新情報ファイルは空です。":text;
+  };
+  ShowDialogLayout(w);
+ }
+ internal static string ReadUpdateNotes(string folder) {
+  try {
+   using var reader=new StreamReader(Path.Combine(folder,"updates.txt"),System.Text.Encoding.UTF8,true);
+   const int limit=65536;var buffer=new char[limit+1];int count=0,read;
+   while(count<buffer.Length&&(read=reader.Read(buffer,count,buffer.Length-count))>0)count+=read;
+   return new string(buffer,0,Math.Min(count,limit))+(count>limit?"\n\n（表示上限を超えたため省略しました。全文は配布フォルダのupdates.txtをご覧ください。）":"");
+  }catch(FileNotFoundException){return null;}catch(DirectoryNotFoundException){return null;}
+  catch(Exception){return "更新情報を読み込めませんでした。配布フォルダのupdates.txtとアクセス権を確認してください。";}
  }
  // Restore only unsaved local changes. Requests already accepted by Kimai are never undone here.
  internal static void RollbackPending(State data) {

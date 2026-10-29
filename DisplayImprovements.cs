@@ -14,9 +14,10 @@ public partial class Blocks {
   if(!zoomHooked){zoomHooked=true;zoomTimer.Tick+=(s,e)=>{if(dragActive||System.Windows.Input.Mouse.LeftButton==System.Windows.Input.MouseButtonState.Pressed)return;zoomTimer.Stop();SetZoom(Hour/144*100*zoomScale,zoomAnchor);};Closed+=(s,e)=>zoomTimer.Stop();}
   double minute=(calendarScroll.VerticalOffset+anchor)/(Hour*zoomScale);
   double percent=Math.Clamp(Hour/144*100*zoomScale*Math.Pow(1.1,delta/120.0),50,400);
-  zoomScale=percent/(Hour/144*100);zoomAnchor=anchor;board.LayoutTransform=new ScaleTransform(1,zoomScale);calendarScroll.UpdateLayout();calendarScroll.ScrollToVerticalOffset(Math.Max(0,minute*Hour*zoomScale-anchor));
+  zoomScale=percent/(Hour/144*100);zoomAnchor=anchor;board.LayoutTransform=new ScaleTransform(1,zoomScale);foreach(var line in board.Children.OfType<Border>().Where(b=>b.Tag as string=="hour-grid-line"))line.Height=HourLineThickness(Hour*zoomScale)/zoomScale;calendarScroll.UpdateLayout();calendarScroll.ScrollToVerticalOffset(Math.Max(0,minute*Hour*zoomScale-anchor));
   zoomTimer.Stop();zoomTimer.Start();status.Text="表示倍率 "+Math.Round(percent)+"%";
  }
+ static double HourLineThickness(double hour)=>Math.Clamp(2*hour/144,1,2);
  internal static int TimeLabelStep(double hour)=>new[]{5,10,15,30,60}.First(step=>step*hour/60>=20);
  void DrawTimeLabels() {
   int step=SlotMinutes*(int)Math.Ceiling(20*60/(Hour*SlotMinutes));for(int minute=0;minute<1440;minute+=step){var label=Label($"{minute/60:00}:{minute%60:00}",minute%60==0?11:10);label.FontWeight=minute%60==0?FontWeights.SemiBold:FontWeights.Normal;label.Foreground=BrushOf(minute%60==0?"#30485E":"#718394");label.Margin=new Thickness(4,0,0,0);label.IsHitTestVisible=false;Canvas.SetTop(label,Math.Max(0,minute/60.0*Hour-6));board.Children.Add(label);}
